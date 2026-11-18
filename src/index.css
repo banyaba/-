@@ -1,0 +1,73 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --theme-primary: #2563eb;
+    --theme-surface: #ffffff;
+    --theme-text: #0f172a;
+    --theme-accent: #10b981;
+    --theme-secondary: #7c3aed;
+    --theme-bg: #f8fafc;
+    --theme-border: #e2e8f0;
+  }
+
+  .dark {
+    --theme-surface: #111827;
+    --theme-text: #f1f5f9;
+    --theme-bg: #0b1120;
+    --theme-border: #1e293b;
+  }
+
+  html {
+    font-family: 'Plus Jakarta Sans', 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: var(--theme-bg);
+    color: var(--theme-text);
+  }
+}
+
+.font-mono-num {
+  font-family: 'JetBrains Mono', 'IBM Plex Sans Thai', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 14mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only-container {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .print-only-container * {
+    color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

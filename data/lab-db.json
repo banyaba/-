@@ -1,0 +1,1389 @@
+{
+  "students": [
+    {
+      "id": "stu_1",
+      "number": 1,
+      "name": "เด็กชายกิตติภพ วงศ์สุวรรณ",
+      "className": "ป.4/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_2",
+      "number": 2,
+      "name": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_3",
+      "number": 3,
+      "name": "เด็กชายธนดล มณีรัตน์",
+      "className": "ป.4/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_4",
+      "number": 1,
+      "name": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_5",
+      "number": 2,
+      "name": "เด็กหญิงสมหญิง รักเรียน",
+      "className": "ป.5/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_6",
+      "number": 3,
+      "name": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_7",
+      "number": 4,
+      "name": "เด็กหญิงพิมพ์ชนก แก้วมณี",
+      "className": "ป.5/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_8",
+      "number": 1,
+      "name": "เด็กชายภูวดล ชัยชนะ",
+      "className": "ป.5/2",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_9",
+      "number": 2,
+      "name": "เด็กหญิงกัญญารัตน์ ทองคำ",
+      "className": "ป.5/2",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_10",
+      "number": 1,
+      "name": "เด็กชายอธิปติ์ บุญมี",
+      "className": "ป.6/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_11",
+      "number": 2,
+      "name": "เด็กหญิงชลธิชา ประเสริฐ",
+      "className": "ป.6/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_12",
+      "number": 3,
+      "name": "เด็กชายวรเมธ แสงจันทร์",
+      "className": "ป.6/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_13",
+      "number": 1,
+      "name": "เด็กหญิงนภัสสร อินทร์แก้ว",
+      "className": "ป.3/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "stu_14",
+      "number": 2,
+      "name": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    }
+  ],
+  "subjects": [
+    {
+      "id": "sub_1",
+      "name": "วิทยาการคำนวณ",
+      "code": "IT01",
+      "note": "การคิดเชิงคำนวณและโปรแกรมพื้นฐาน",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "sub_2",
+      "name": "เทคโนโลยีสารสนเทศ",
+      "code": "IT02",
+      "note": "การใช้โปรแกรมสำนักงานและอินเทอร์เน็ต",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "sub_3",
+      "name": "วิทยาศาสตร์",
+      "code": "SC101",
+      "note": "สืบค้นข้อมูลและจำลองการทดลอง",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "sub_4",
+      "name": "คณิตศาสตร์",
+      "code": "MA101",
+      "note": "แบบฝึกหัดออนไลน์และเรขาคณิต",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "sub_5",
+      "name": "ภาษาไทย",
+      "code": "TH101",
+      "note": "ฝึกพิมพ์สัมผัสและจัดทำโครงงาน",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "sub_6",
+      "name": "ภาษาอังกฤษ",
+      "code": "EN101",
+      "note": "บทเรียนออนไลน์และสื่อโสตทัศน์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    }
+  ],
+  "logs": [
+    {
+      "id": "log_1",
+      "date": "2026-01-03",
+      "timeIn": "09:00",
+      "studentId": "stu_2",
+      "studentName": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ค้นคว้าข้อมูล"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_2",
+      "date": "2026-01-05",
+      "timeIn": "09:00",
+      "studentId": "stu_4",
+      "studentName": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ค้นคว้าข้อมูล"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_3",
+      "date": "2026-01-07",
+      "timeIn": "09:00",
+      "studentId": "stu_6",
+      "studentName": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ค้นคว้าข้อมูล"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_4",
+      "date": "2026-01-09",
+      "timeIn": "09:00",
+      "studentId": "stu_8",
+      "studentName": "เด็กชายภูวดล ชัยชนะ",
+      "className": "ป.5/2",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ค้นคว้าข้อมูล"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_5",
+      "date": "2026-02-03",
+      "timeIn": "10:00",
+      "studentId": "stu_6",
+      "studentName": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_6",
+      "date": "2026-02-05",
+      "timeIn": "10:00",
+      "studentId": "stu_8",
+      "studentName": "เด็กชายภูวดล ชัยชนะ",
+      "className": "ป.5/2",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_7",
+      "date": "2026-02-07",
+      "timeIn": "10:00",
+      "studentId": "stu_10",
+      "studentName": "เด็กชายอธิปติ์ บุญมี",
+      "className": "ป.6/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_8",
+      "date": "2026-02-09",
+      "timeIn": "10:00",
+      "studentId": "stu_12",
+      "studentName": "เด็กชายวรเมธ แสงจันทร์",
+      "className": "ป.6/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_9",
+      "date": "2026-02-11",
+      "timeIn": "10:00",
+      "studentId": "stu_14",
+      "studentName": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_10",
+      "date": "2026-03-03",
+      "timeIn": "13:30",
+      "studentId": "stu_11",
+      "studentName": "เด็กหญิงชลธิชา ประเสริฐ",
+      "className": "ป.6/1",
+      "subjectId": "sub_5",
+      "subjectName": "ภาษาไทย",
+      "usageTypes": [
+        "สืบค้นอินเทอร์เน็ต",
+        "โครงงาน"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_11",
+      "date": "2026-03-05",
+      "timeIn": "13:30",
+      "studentId": "stu_13",
+      "studentName": "เด็กหญิงนภัสสร อินทร์แก้ว",
+      "className": "ป.3/1",
+      "subjectId": "sub_1",
+      "subjectName": "วิทยาการคำนวณ",
+      "usageTypes": [
+        "สืบค้นอินเทอร์เน็ต",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_12",
+      "date": "2026-03-07",
+      "timeIn": "13:30",
+      "studentId": "stu_1",
+      "studentName": "เด็กชายกิตติภพ วงศ์สุวรรณ",
+      "className": "ป.4/1",
+      "subjectId": "sub_3",
+      "subjectName": "วิทยาศาสตร์",
+      "usageTypes": [
+        "สืบค้นอินเทอร์เน็ต",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_13",
+      "date": "2026-04-03",
+      "timeIn": "09:30",
+      "studentId": "stu_14",
+      "studentName": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_14",
+      "date": "2026-04-05",
+      "timeIn": "09:30",
+      "studentId": "stu_2",
+      "studentName": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_15",
+      "date": "2026-05-03",
+      "timeIn": "08:45",
+      "studentId": "stu_2",
+      "studentName": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ศึกษาบทเรียนออนไลน์"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_16",
+      "date": "2026-05-05",
+      "timeIn": "08:45",
+      "studentId": "stu_4",
+      "studentName": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ศึกษาบทเรียนออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_17",
+      "date": "2026-05-07",
+      "timeIn": "08:45",
+      "studentId": "stu_6",
+      "studentName": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ศึกษาบทเรียนออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_18",
+      "date": "2026-05-09",
+      "timeIn": "08:45",
+      "studentId": "stu_8",
+      "studentName": "เด็กชายภูวดล ชัยชนะ",
+      "className": "ป.5/2",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ศึกษาบทเรียนออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_19",
+      "date": "2026-05-11",
+      "timeIn": "08:45",
+      "studentId": "stu_10",
+      "studentName": "เด็กชายอธิปติ์ บุญมี",
+      "className": "ป.6/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ศึกษาบทเรียนออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_20",
+      "date": "2026-05-13",
+      "timeIn": "08:45",
+      "studentId": "stu_12",
+      "studentName": "เด็กชายวรเมธ แสงจันทร์",
+      "className": "ป.6/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ศึกษาบทเรียนออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_21",
+      "date": "2026-05-15",
+      "timeIn": "08:45",
+      "studentId": "stu_14",
+      "studentName": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "ศึกษาบทเรียนออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_22",
+      "date": "2026-06-03",
+      "timeIn": "10:15",
+      "studentId": "stu_9",
+      "studentName": "เด็กหญิงกัญญารัตน์ ทองคำ",
+      "className": "ป.5/2",
+      "subjectId": "sub_5",
+      "subjectName": "ภาษาไทย",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_23",
+      "date": "2026-06-05",
+      "timeIn": "10:15",
+      "studentId": "stu_11",
+      "studentName": "เด็กหญิงชลธิชา ประเสริฐ",
+      "className": "ป.6/1",
+      "subjectId": "sub_1",
+      "subjectName": "วิทยาการคำนวณ",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_24",
+      "date": "2026-06-07",
+      "timeIn": "10:15",
+      "studentId": "stu_13",
+      "studentName": "เด็กหญิงนภัสสร อินทร์แก้ว",
+      "className": "ป.3/1",
+      "subjectId": "sub_3",
+      "subjectName": "วิทยาศาสตร์",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_25",
+      "date": "2026-06-09",
+      "timeIn": "10:15",
+      "studentId": "stu_1",
+      "studentName": "เด็กชายกิตติภพ วงศ์สุวรรณ",
+      "className": "ป.4/1",
+      "subjectId": "sub_5",
+      "subjectName": "ภาษาไทย",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_26",
+      "date": "2026-06-11",
+      "timeIn": "10:15",
+      "studentId": "stu_3",
+      "studentName": "เด็กชายธนดล มณีรัตน์",
+      "className": "ป.4/1",
+      "subjectId": "sub_1",
+      "subjectName": "วิทยาการคำนวณ",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_27",
+      "date": "2026-06-13",
+      "timeIn": "10:15",
+      "studentId": "stu_5",
+      "studentName": "เด็กหญิงสมหญิง รักเรียน",
+      "className": "ป.5/1",
+      "subjectId": "sub_3",
+      "subjectName": "วิทยาศาสตร์",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_28",
+      "date": "2026-06-15",
+      "timeIn": "10:15",
+      "studentId": "stu_7",
+      "studentName": "เด็กหญิงพิมพ์ชนก แก้วมณี",
+      "className": "ป.5/1",
+      "subjectId": "sub_5",
+      "subjectName": "ภาษาไทย",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_29",
+      "date": "2026-06-17",
+      "timeIn": "10:15",
+      "studentId": "stu_9",
+      "studentName": "เด็กหญิงกัญญารัตน์ ทองคำ",
+      "className": "ป.5/2",
+      "subjectId": "sub_1",
+      "subjectName": "วิทยาการคำนวณ",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_30",
+      "date": "2026-06-19",
+      "timeIn": "10:15",
+      "studentId": "stu_11",
+      "studentName": "เด็กหญิงชลธิชา ประเสริฐ",
+      "className": "ป.6/1",
+      "subjectId": "sub_3",
+      "subjectName": "วิทยาศาสตร์",
+      "usageTypes": [
+        "ฝึกพิมพ์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_31",
+      "date": "2026-07-03",
+      "timeIn": "11:00",
+      "studentId": "stu_4",
+      "studentName": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "โครงงาน"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_32",
+      "date": "2026-07-05",
+      "timeIn": "11:00",
+      "studentId": "stu_6",
+      "studentName": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_33",
+      "date": "2026-07-07",
+      "timeIn": "11:00",
+      "studentId": "stu_8",
+      "studentName": "เด็กชายภูวดล ชัยชนะ",
+      "className": "ป.5/2",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_34",
+      "date": "2026-07-09",
+      "timeIn": "11:00",
+      "studentId": "stu_10",
+      "studentName": "เด็กชายอธิปติ์ บุญมี",
+      "className": "ป.6/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_35",
+      "date": "2026-07-11",
+      "timeIn": "11:00",
+      "studentId": "stu_12",
+      "studentName": "เด็กชายวรเมธ แสงจันทร์",
+      "className": "ป.6/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_36",
+      "date": "2026-07-13",
+      "timeIn": "11:00",
+      "studentId": "stu_14",
+      "studentName": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_37",
+      "date": "2026-07-15",
+      "timeIn": "11:00",
+      "studentId": "stu_2",
+      "studentName": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_38",
+      "date": "2026-07-17",
+      "timeIn": "11:00",
+      "studentId": "stu_4",
+      "studentName": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "โครงงาน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_39",
+      "date": "2026-08-03",
+      "timeIn": "13:00",
+      "studentId": "stu_12",
+      "studentName": "เด็กชายวรเมธ แสงจันทร์",
+      "className": "ป.6/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_40",
+      "date": "2026-08-05",
+      "timeIn": "13:00",
+      "studentId": "stu_14",
+      "studentName": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_41",
+      "date": "2026-08-07",
+      "timeIn": "13:00",
+      "studentId": "stu_2",
+      "studentName": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_42",
+      "date": "2026-08-09",
+      "timeIn": "13:00",
+      "studentId": "stu_4",
+      "studentName": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_43",
+      "date": "2026-08-11",
+      "timeIn": "13:00",
+      "studentId": "stu_6",
+      "studentName": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_44",
+      "date": "2026-08-13",
+      "timeIn": "13:00",
+      "studentId": "stu_8",
+      "studentName": "เด็กชายภูวดล ชัยชนะ",
+      "className": "ป.5/2",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_45",
+      "date": "2026-08-15",
+      "timeIn": "13:00",
+      "studentId": "stu_10",
+      "studentName": "เด็กชายอธิปติ์ บุญมี",
+      "className": "ป.6/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_46",
+      "date": "2026-08-17",
+      "timeIn": "13:00",
+      "studentId": "stu_12",
+      "studentName": "เด็กชายวรเมธ แสงจันทร์",
+      "className": "ป.6/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_47",
+      "date": "2026-08-19",
+      "timeIn": "13:00",
+      "studentId": "stu_14",
+      "studentName": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_48",
+      "date": "2026-08-21",
+      "timeIn": "13:00",
+      "studentId": "stu_2",
+      "studentName": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_49",
+      "date": "2026-08-23",
+      "timeIn": "13:00",
+      "studentId": "stu_4",
+      "studentName": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "เขียนโปรแกรม",
+        "แบบฝึกหัดออนไลน์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_50",
+      "date": "2026-09-03",
+      "timeIn": "14:00",
+      "studentId": "stu_9",
+      "studentName": "เด็กหญิงกัญญารัตน์ ทองคำ",
+      "className": "ป.5/2",
+      "subjectId": "sub_3",
+      "subjectName": "วิทยาศาสตร์",
+      "usageTypes": [
+        "ศึกษาบทเรียนออนไลน์",
+        "สื่อการเรียน"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_51",
+      "date": "2026-09-05",
+      "timeIn": "14:00",
+      "studentId": "stu_11",
+      "studentName": "เด็กหญิงชลธิชา ประเสริฐ",
+      "className": "ป.6/1",
+      "subjectId": "sub_5",
+      "subjectName": "ภาษาไทย",
+      "usageTypes": [
+        "ศึกษาบทเรียนออนไลน์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_52",
+      "date": "2026-09-07",
+      "timeIn": "14:00",
+      "studentId": "stu_13",
+      "studentName": "เด็กหญิงนภัสสร อินทร์แก้ว",
+      "className": "ป.3/1",
+      "subjectId": "sub_1",
+      "subjectName": "วิทยาการคำนวณ",
+      "usageTypes": [
+        "ศึกษาบทเรียนออนไลน์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_53",
+      "date": "2026-09-09",
+      "timeIn": "14:00",
+      "studentId": "stu_1",
+      "studentName": "เด็กชายกิตติภพ วงศ์สุวรรณ",
+      "className": "ป.4/1",
+      "subjectId": "sub_3",
+      "subjectName": "วิทยาศาสตร์",
+      "usageTypes": [
+        "ศึกษาบทเรียนออนไลน์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_54",
+      "date": "2026-09-11",
+      "timeIn": "14:00",
+      "studentId": "stu_3",
+      "studentName": "เด็กชายธนดล มณีรัตน์",
+      "className": "ป.4/1",
+      "subjectId": "sub_5",
+      "subjectName": "ภาษาไทย",
+      "usageTypes": [
+        "ศึกษาบทเรียนออนไลน์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_55",
+      "date": "2026-09-13",
+      "timeIn": "14:00",
+      "studentId": "stu_5",
+      "studentName": "เด็กหญิงสมหญิง รักเรียน",
+      "className": "ป.5/1",
+      "subjectId": "sub_1",
+      "subjectName": "วิทยาการคำนวณ",
+      "usageTypes": [
+        "ศึกษาบทเรียนออนไลน์",
+        "สื่อการเรียน"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_56",
+      "date": "2026-10-03",
+      "timeIn": "09:15",
+      "studentId": "stu_1",
+      "studentName": "เด็กชายกิตติภพ วงศ์สุวรรณ",
+      "className": "ป.4/1",
+      "subjectId": "sub_3",
+      "subjectName": "วิทยาศาสตร์",
+      "usageTypes": [
+        "ฝึกพิมพ์"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_57",
+      "date": "2026-10-05",
+      "timeIn": "09:15",
+      "studentId": "stu_3",
+      "studentName": "เด็กชายธนดล มณีรัตน์",
+      "className": "ป.4/1",
+      "subjectId": "sub_5",
+      "subjectName": "ภาษาไทย",
+      "usageTypes": [
+        "ฝึกพิมพ์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_58",
+      "date": "2026-10-07",
+      "timeIn": "09:15",
+      "studentId": "stu_5",
+      "studentName": "เด็กหญิงสมหญิง รักเรียน",
+      "className": "ป.5/1",
+      "subjectId": "sub_1",
+      "subjectName": "วิทยาการคำนวณ",
+      "usageTypes": [
+        "ฝึกพิมพ์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_59",
+      "date": "2026-10-09",
+      "timeIn": "09:15",
+      "studentId": "stu_7",
+      "studentName": "เด็กหญิงพิมพ์ชนก แก้วมณี",
+      "className": "ป.5/1",
+      "subjectId": "sub_3",
+      "subjectName": "วิทยาศาสตร์",
+      "usageTypes": [
+        "ฝึกพิมพ์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_60",
+      "date": "2026-10-11",
+      "timeIn": "09:15",
+      "studentId": "stu_9",
+      "studentName": "เด็กหญิงกัญญารัตน์ ทองคำ",
+      "className": "ป.5/2",
+      "subjectId": "sub_5",
+      "subjectName": "ภาษาไทย",
+      "usageTypes": [
+        "ฝึกพิมพ์"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_61",
+      "date": "2026-11-18",
+      "timeIn": "09:00",
+      "studentId": "stu_6",
+      "studentName": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "เขียนโปรแกรม"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_62",
+      "date": "2026-11-05",
+      "timeIn": "09:00",
+      "studentId": "stu_8",
+      "studentName": "เด็กชายภูวดล ชัยชนะ",
+      "className": "ป.5/2",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "เขียนโปรแกรม"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_63",
+      "date": "2026-11-07",
+      "timeIn": "09:00",
+      "studentId": "stu_10",
+      "studentName": "เด็กชายอธิปติ์ บุญมี",
+      "className": "ป.6/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "เขียนโปรแกรม"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_64",
+      "date": "2026-11-09",
+      "timeIn": "09:00",
+      "studentId": "stu_12",
+      "studentName": "เด็กชายวรเมธ แสงจันทร์",
+      "className": "ป.6/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "เขียนโปรแกรม"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_65",
+      "date": "2026-11-11",
+      "timeIn": "09:00",
+      "studentId": "stu_14",
+      "studentName": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "เขียนโปรแกรม"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_66",
+      "date": "2026-11-13",
+      "timeIn": "09:00",
+      "studentId": "stu_2",
+      "studentName": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "เขียนโปรแกรม"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_67",
+      "date": "2026-11-15",
+      "timeIn": "09:00",
+      "studentId": "stu_4",
+      "studentName": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "เขียนโปรแกรม"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_68",
+      "date": "2026-11-17",
+      "timeIn": "09:00",
+      "studentId": "stu_6",
+      "studentName": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "ค้นคว้าข้อมูล",
+        "เขียนโปรแกรม"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_69",
+      "date": "2026-12-03",
+      "timeIn": "10:30",
+      "studentId": "stu_14",
+      "studentName": "เด็กชายพีรพล วัฒนกุล",
+      "className": "ป.3/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "แบบฝึกหัดออนไลน์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "ใช้งานปกติ",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_70",
+      "date": "2026-12-05",
+      "timeIn": "10:30",
+      "studentId": "stu_2",
+      "studentName": "เด็กหญิงปภาวรินท์ ศรีสวัสดิ์",
+      "className": "ป.4/1",
+      "subjectId": "sub_6",
+      "subjectName": "ภาษาอังกฤษ",
+      "usageTypes": [
+        "แบบฝึกหัดออนไลน์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_71",
+      "date": "2026-12-07",
+      "timeIn": "10:30",
+      "studentId": "stu_4",
+      "studentName": "เด็กชายสมชาย ใจดี",
+      "className": "ป.5/1",
+      "subjectId": "sub_2",
+      "subjectName": "เทคโนโลยีสารสนเทศ",
+      "usageTypes": [
+        "แบบฝึกหัดออนไลน์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    },
+    {
+      "id": "log_72",
+      "date": "2026-12-09",
+      "timeIn": "10:30",
+      "studentId": "stu_6",
+      "studentName": "เด็กชายณัฐวุฒิ พงษ์ไพบูลย์",
+      "className": "ป.5/1",
+      "subjectId": "sub_4",
+      "subjectName": "คณิตศาสตร์",
+      "usageTypes": [
+        "แบบฝึกหัดออนไลน์",
+        "โปรแกรมการศึกษา"
+      ],
+      "note": "",
+      "recorder": "ครูธนากร สุขสวัสดิ์",
+      "createdAt": "2026-11-18T04:41:02.248Z"
+    }
+  ],
+  "usageTypes": [
+    "ค้นคว้าข้อมูล",
+    "ศึกษาบทเรียนออนไลน์",
+    "โปรแกรมการศึกษา",
+    "ฝึกพิมพ์",
+    "เขียนโปรแกรม",
+    "แบบฝึกหัดออนไลน์",
+    "โครงงาน",
+    "สืบค้นอินเทอร์เน็ต",
+    "สื่อการเรียน",
+    "อื่นๆ"
+  ],
+  "settings": {
+    "schoolName": "โรงเรียนสาธิตเทคโนโลยีวิทยา",
+    "academicYear": "2569",
+    "labManager": "ครูธนากร สุขสวัสดิ์",
+    "colors": {
+      "primary": "#2563eb",
+      "surface": "#ffffff",
+      "text": "#0f172a",
+      "accent": "#10b981",
+      "secondary": "#7c3aed"
+    }
+  }
+}

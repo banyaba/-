@@ -1,0 +1,6 @@
+{
+  "name": "ระบบบันทึกการใช้ห้องคอมพิวเตอร์",
+  "description": "ระบบบันทึกและรายงานสถิติการใช้ห้องคอมพิวเตอร์สำหรับโรงเรียน พร้อมจัดการข้อมูลนักเรียน รายวิชา และพิมพ์รายงาน A4",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

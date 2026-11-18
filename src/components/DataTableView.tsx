@@ -1,0 +1,309 @@
+import { useMemo, useState } from 'react';
+import { Search, Calendar, Trash2, Pencil, RotateCcw } from 'lucide-react';
+import { CLASS_LIST, type Subject, type UsageLog, type UserRole } from '../types';
+import { formatBuddhistISO, getTodayISO } from '../utils/thaiDate';
+import { api } from '../api/client';
+import { ConfirmModal } from './ConfirmModal';
+
+interface DataTableViewProps {
+  role: UserRole;
+  logs: UsageLog[];
+  subjects: Subject[];
+  onEditLog: (log: UsageLog) => void;
+  onLogsChanged: (next: UsageLog[]) => void;
+  onNotify: (type: 'success' | 'error', message: string) => void;
+}
+
+export function DataTableView({
+  role,
+  logs,
+  subjects,
+  onEditLog,
+  onLogsChanged,
+  onNotify,
+}: DataTableViewProps) {
+  const [searchName, setSearchName] = useState('');
+  const [searchDate, setSearchDate] = useState('');
+  const [searchClass, setSearchClass] = useState('all');
+  const [searchSubject, setSearchSubject] = useState('all');
+
+  const [deleteTarget, setDeleteTarget] = useState<UsageLog | null>(null);
+  const [confirmDeleteToday, setConfirmDeleteToday] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const todayISO = getTodayISO();
+  const todayCount = useMemo(
+    () => logs.filter((l) => l.date === todayISO).length,
+    [logs, todayISO]
+  );
+
+  const subjectOptions = useMemo(() => {
+    const names = new Set<string>(subjects.map((s) => s.name));
+    logs.forEach((l) => names.add(l.subjectName));
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'th'));
+  }, [subjects, logs]);
+
+  const filteredLogs = useMemo(() => {
+    const q = searchName.trim().toLowerCase();
+    return logs.filter((log) => {
+      if (q && !log.studentName.toLowerCase().includes(q)) return false;
+      if (searchDate && log.date !== searchDate) return false;
+      if (searchClass !== 'all' && log.className !== searchClass) return false;
+      if (searchSubject !== 'all' && log.subjectName !== searchSubject) return false;
+      return true;
+    });
+  }, [logs, searchName, searchDate, searchClass, searchSubject]);
+
+  const hasFilters =
+    searchName !== '' || searchDate !== '' || searchClass !== 'all' || searchSubject !== 'all';
+
+  const handleDeleteOne = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.deleteLog(deleteTarget.id);
+      onLogsChanged(logs.filter((l) => l.id !== deleteTarget.id));
+      onNotify('success', `ลบข้อมูลของ ${deleteTarget.studentName} เรียบร้อยแล้ว`);
+      setDeleteTarget(null);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถลบข้อมูลได้');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteToday = async () => {
+    setDeleting(true);
+    try {
+      const res = await api.deleteLogsByDate(todayISO);
+      onLogsChanged(logs.filter((l) => l.date !== todayISO));
+      onNotify('success', `ลบข้อมูลวันนี้ทั้งหมด (${res.deleted} รายการ) เรียบร้อยแล้ว`);
+      setConfirmDeleteToday(false);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถลบข้อมูลวันนี้ได้');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* 4 Filters Toolbar */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div>
+            <label htmlFor="filter-name" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+              ค้นหาชื่อ
+            </label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                id="filter-name"
+                type="text"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                placeholder="พิมพ์ชื่อนักเรียน..."
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="filter-date" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+              ค้นหาวันที่
+            </label>
+            <div className="relative">
+              <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                id="filter-date"
+                type="date"
+                value={searchDate}
+                onChange={(e) => setSearchDate(e.target.value)}
+                className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="filter-class" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+              ค้นหาชั้นเรียน
+            </label>
+            <select
+              id="filter-class"
+              value={searchClass}
+              onChange={(e) => setSearchClass(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">ทุกชั้นเรียน</option>
+              {CLASS_LIST.map((cls) => (
+                <option key={cls} value={cls}>
+                  {cls}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="filter-subject" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+              ค้นหาวิชา
+            </label>
+            <select
+              id="filter-subject"
+              value={searchSubject}
+              onChange={(e) => setSearchSubject(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">ทุกรายวิชา</option>
+              {subjectOptions.map((sub) => (
+                <option key={sub} value={sub}>
+                  {sub}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="font-mono-num text-xs font-medium text-slate-600 dark:text-slate-400">
+              แสดง {filteredLogs.length.toLocaleString('th-TH')} จาก {logs.length.toLocaleString('th-TH')} รายการ
+            </span>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchName('');
+                  setSearchDate('');
+                  setSearchClass('all');
+                  setSearchSubject('all');
+                }}
+                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>ล้างตัวกรอง</span>
+              </button>
+            )}
+          </div>
+
+          {role === 'admin' && (
+            <button
+              type="button"
+              disabled={todayCount === 0}
+              onClick={() => setConfirmDeleteToday(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-800/80 bg-rose-50 dark:bg-rose-950/50 px-3.5 py-1.5 text-xs font-medium text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>ลบข้อมูลวันนี้ทั้งหมด ({todayCount})</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+        {filteredLogs.length === 0 ? (
+          <div className="px-6 py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+            ไม่พบข้อมูลการใช้ห้องคอมพิวเตอร์ที่ตรงกับเงื่อนไข
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3 w-14">#</th>
+                  <th className="px-4 py-3 whitespace-nowrap">วันที่</th>
+                  <th className="px-4 py-3 whitespace-nowrap">เข้าใช้</th>
+                  <th className="px-4 py-3 whitespace-nowrap">ห้อง / เครื่อง</th>
+                  <th className="px-4 py-3 whitespace-nowrap">ชื่อ</th>
+                  <th className="px-4 py-3 whitespace-nowrap">ชั้น</th>
+                  <th className="px-4 py-3 whitespace-nowrap">วิชา</th>
+                  <th className="px-4 py-3">รูปแบบ</th>
+                  <th className="px-5 py-3 text-right whitespace-nowrap">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredLogs.map((log, index) => (
+                  <tr key={log.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-2.5 font-mono-num text-xs text-slate-500 dark:text-slate-400">
+                      {index + 1}
+                    </td>
+                    <td className="px-4 py-2.5 font-mono-num text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {formatBuddhistISO(log.date)}
+                    </td>
+                    <td className="px-4 py-2.5 font-mono-num text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {log.timeIn || '-'}
+                    </td>
+                    <td className="px-4 py-2.5 font-mono-num text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {log.computerRoom || log.computerNumber
+                        ? `${log.computerRoom || '-'}${
+                            log.computerNumber ? ` · เครื่อง ${log.computerNumber}` : ''
+                          }`
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                      {log.studentName}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {log.className}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {log.subjectName}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400 max-w-xs truncate">
+                      {log.usageTypes.length > 0 ? log.usageTypes.join(', ') : '-'}
+                    </td>
+                    <td className="px-5 py-2.5 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => onEditLog(log)}
+                        className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-400 transition-colors"
+                        title="แก้ไข"
+                        aria-label={`แก้ไขรายการของ ${log.studentName}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      {role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(log)}
+                          className="ml-1 inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 transition-colors"
+                          title="ลบ"
+                          aria-label={`ลบรายการของ ${log.studentName}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        title="ยืนยันการลบข้อมูล"
+        description={`ต้องการลบรายการของ "${deleteTarget?.studentName || ''}" วันที่ ${
+          deleteTarget ? formatBuddhistISO(deleteTarget.date) : ''
+        } หรือไม่?`}
+        loading={deleting}
+        onConfirm={handleDeleteOne}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmModal
+        open={confirmDeleteToday}
+        title="ยืนยันการลบข้อมูลวันนี้ทั้งหมด"
+        description={`ต้องการลบข้อมูลการใช้งานของวันนี้ (${formatBuddhistISO(
+          todayISO
+        )}) ทั้งหมดจำนวน ${todayCount} รายการหรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`}
+        confirmLabel="ลบข้อมูลวันนี้ทั้งหมด"
+        loading={deleting}
+        onConfirm={handleDeleteToday}
+        onCancel={() => setConfirmDeleteToday(false)}
+      />
+    </div>
+  );
+}
