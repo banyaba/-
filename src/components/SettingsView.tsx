@@ -137,10 +137,7 @@ export function SettingsView({
       onPinHashesChanged(updated);
       setNewAdminPin('');
       setNewUserPin('');
-      onNotify(
-        'success',
-        `รีเซ็ตรหัส PIN เป็นค่าเริ่มต้นแล้ว (Admin: ${DEFAULT_ADMIN_PIN_6}, User: ${DEFAULT_USER_PIN_6})`
-      );
+      onNotify('success', 'รีเซ็ตรหัส PIN เป็นค่าเริ่มต้นเรียบร้อยแล้ว');
     } catch (err) {
       onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถรีเซ็ตรหัส PIN ได้');
     } finally {
@@ -412,7 +409,7 @@ export function SettingsView({
               ตั้งค่ารหัสผ่านเข้าสู่ระบบ 6 หลัก (PIN)
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              กำหนดรหัสตัวเลข 6 หลัก สำหรับเข้าสู่ระบบและปลดล็อกหน้าจอ (ค่าเริ่มต้น Admin: <span className="font-mono-num font-semibold">{DEFAULT_ADMIN_PIN_6}</span> · User: <span className="font-mono-num font-semibold">{DEFAULT_USER_PIN_6}</span>)
+              กำหนดรหัสตัวเลข 6 หลัก สำหรับเข้าสู่ระบบและปลดล็อกหน้าจอ
             </p>
           </div>
         </div>

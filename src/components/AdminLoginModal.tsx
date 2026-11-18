@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, X, Lock } from 'lucide-react';
 import { PinCodeInput } from './PinCodeInput';
-import { DEFAULT_ADMIN_PIN_6, verifyAdminPin6, type PinHashes } from '../firebase/pinAuth';
+import { verifyAdminPin6, type PinHashes } from '../firebase/pinAuth';
 
 interface AdminLoginModalProps {
   open: boolean;
@@ -91,12 +91,11 @@ export function AdminLoginModal({ open, pinHashes, onClose, onSuccess }: AdminLo
         </div>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
             <span className="inline-flex items-center gap-1.5">
               <Lock className="h-3.5 w-3.5" />
               รหัส PIN ผู้ดูแลระบบ
             </span>
-            <span className="font-mono-num">ค่าเริ่มต้น: {DEFAULT_ADMIN_PIN_6}</span>
           </div>
 
           <PinCodeInput
