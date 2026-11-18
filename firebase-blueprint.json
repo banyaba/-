@@ -1,0 +1,352 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Student roster record for a classroom.",
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "integer",
+          "description": "Optional class roll number (or null if unassigned)."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Student full name."
+        },
+        "className": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20,
+          "pattern": "^ป\\.[1-6]/[1-3]$",
+          "description": "Classroom identifier (e.g. ป.5/1)."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the creator."
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["school"],
+          "maxLength": 20,
+          "description": "Shared school visibility scope."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp."
+        }
+      },
+      "required": ["number", "name", "className", "ownerId", "visibility", "createdAt", "updatedAt"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Academic subject taught in the computer lab.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Subject name."
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Subject code."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 240,
+          "description": "Optional subject description."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the creator."
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["school"],
+          "maxLength": 20,
+          "description": "Shared school visibility scope."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp."
+        }
+      },
+      "required": ["name", "code", "note", "ownerId", "visibility", "createdAt", "updatedAt"]
+    },
+    "UsageLog": {
+      "title": "UsageLog",
+      "description": "Computer lab usage entry for a student or class session.",
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Gregorian ISO date (YYYY-MM-DD)."
+        },
+        "timeIn": {
+          "type": "string",
+          "maxLength": 10,
+          "description": "Check-in time (HH:mm or empty)."
+        },
+        "computerRoom": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Computer room name (e.g. คอม1, คอม2)."
+        },
+        "computerNumber": {
+          "type": "string",
+          "maxLength": 16,
+          "description": "Workstation number (1-30 or empty)."
+        },
+        "studentId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Linked student document ID or empty."
+        },
+        "studentName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Student full name."
+        },
+        "className": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20,
+          "pattern": "^ป\\.[1-6]/[1-3]$",
+          "description": "Classroom identifier."
+        },
+        "subjectId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Linked subject document ID or empty."
+        },
+        "subjectName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Subject name."
+        },
+        "usageTypes": {
+          "type": "array",
+          "description": "Selected or custom usage activities (max 30)."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Optional session note."
+        },
+        "recorder": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Staff or teacher recording the log."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the creator."
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["school"],
+          "maxLength": 20,
+          "description": "Shared school visibility scope."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp."
+        }
+      },
+      "required": [
+        "date",
+        "timeIn",
+        "computerRoom",
+        "computerNumber",
+        "studentId",
+        "studentName",
+        "className",
+        "subjectId",
+        "subjectName",
+        "usageTypes",
+        "note",
+        "recorder",
+        "ownerId",
+        "visibility",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LabSettings": {
+      "title": "LabSettings",
+      "description": "School metadata, theme palette, and preset usage types.",
+      "type": "object",
+      "properties": {
+        "schoolName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "School display name."
+        },
+        "academicYear": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 10,
+          "description": "Buddhist Era academic year."
+        },
+        "labManager": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Default lab manager name."
+        },
+        "colors": {
+          "type": "object",
+          "description": "Recolorable 5-token theme color map."
+        },
+        "usageTypes": {
+          "type": "array",
+          "description": "Configurable usage activity options (max 50)."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the admin who initialized settings."
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["school"],
+          "maxLength": 20,
+          "description": "Shared school visibility scope."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp."
+        }
+      },
+      "required": [
+        "schoolName",
+        "academicYear",
+        "labManager",
+        "colors",
+        "usageTypes",
+        "ownerId",
+        "visibility",
+        "updatedAt"
+      ]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Admin role assignment document keyed by UID.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Admin email address."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "SecurityPins": {
+      "title": "SecurityPins",
+      "description": "Hashed 6-digit PIN configuration for Admin and User login.",
+      "type": "object",
+      "properties": {
+        "adminPinHash": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hex digest of the 6-digit Admin PIN."
+        },
+        "userPinHash": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hex digest of the 6-digit User PIN."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the admin who initialized or updated the PINs."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp."
+        }
+      },
+      "required": ["adminPinHash", "userPinHash", "ownerId", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Roster of students across classes ป.1/1 - ป.6/3."
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/Subject" },
+      "description": "Catalog of computer lab subjects."
+    },
+    "/logs/{logId}": {
+      "schema": { "$ref": "#/entities/UsageLog" },
+      "description": "Computer lab usage log entries."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/LabSettings" },
+      "description": "Global application configuration document (ID: app)."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminRole" },
+      "description": "Delegated admin UID records."
+    },
+    "/security/{docId}": {
+      "schema": { "$ref": "#/entities/SecurityPins" },
+      "description": "Admin-only hashed 6-digit login PIN settings (ID: pins)."
+    }
+  }
+}

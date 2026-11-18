@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
-import { Save, RotateCcw, Palette, School, ListChecks, Trash2, Database } from 'lucide-react';
+import { Save, RotateCcw, Palette, School, ListChecks, Trash2, Database, KeyRound } from 'lucide-react';
 import { DEFAULT_THEME_COLORS, type AppSettings, type ThemeColors } from '../types';
 import { api } from '../api/client';
 import { UsageTypesManagerPanel } from './UsageTypesManagerModal';
 import { ConfirmModal } from './ConfirmModal';
+import {
+  DEFAULT_ADMIN_PIN_6,
+  DEFAULT_USER_PIN_6,
+  isValidPin6,
+  type PinHashes,
+} from '../firebase/pinAuth';
+import { updateSecurityPins } from '../firebase/firestoreService';
 
 interface SettingsViewProps {
   settings: AppSettings;
   usageTypes: string[];
+  pinHashes: PinHashes | null;
   counts: {
     logs: number;
     students: number;
@@ -15,6 +23,7 @@ interface SettingsViewProps {
   };
   onSettingsUpdated: (next: AppSettings) => void;
   onUsageTypesChanged: (next: string[]) => void;
+  onPinHashesChanged: (next: PinHashes) => void;
   onClearLogsOnly: () => void;
   onClearAllData: () => void;
   onNotify: (type: 'success' | 'error', message: string) => void;
@@ -60,9 +69,11 @@ const COLOR_PRESETS: { name: string; colors: ThemeColors }[] = [
 export function SettingsView({
   settings,
   usageTypes,
+  pinHashes,
   counts,
   onSettingsUpdated,
   onUsageTypesChanged,
+  onPinHashesChanged,
   onClearLogsOnly,
   onClearAllData,
   onNotify,
@@ -73,8 +84,69 @@ export function SettingsView({
   const [colors, setColors] = useState<ThemeColors>(settings.colors);
   const [saving, setSaving] = useState(false);
 
+  const [newAdminPin, setNewAdminPin] = useState('');
+  const [newUserPin, setNewUserPin] = useState('');
+  const [savingPins, setSavingPins] = useState(false);
+
   const [clearModal, setClearModal] = useState<'logs' | 'all' | null>(null);
   const [clearing, setClearing] = useState(false);
+
+  const handleSavePins = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const adminTrimmed = newAdminPin.trim();
+    const userTrimmed = newUserPin.trim();
+    if (!adminTrimmed && !userTrimmed) {
+      onNotify('error', 'กรุณากรอกรหัส PIN 6 หลักอย่างน้อย 1 ช่องที่ต้องการเปลี่ยน');
+      return;
+    }
+    if (adminTrimmed && !isValidPin6(adminTrimmed)) {
+      onNotify('error', 'รหัส PIN ผู้ดูแลระบบต้องเป็นตัวเลข 6 หลัก');
+      return;
+    }
+    if (userTrimmed && !isValidPin6(userTrimmed)) {
+      onNotify('error', 'รหัส PIN ผู้ใช้งานทั่วไปต้องเป็นตัวเลข 6 หลัก');
+      return;
+    }
+
+    setSavingPins(true);
+    try {
+      const updated = await updateSecurityPins(
+        adminTrimmed || null,
+        userTrimmed || null,
+        pinHashes
+      );
+      onPinHashesChanged(updated);
+      setNewAdminPin('');
+      setNewUserPin('');
+      onNotify('success', 'บันทึกรหัสผ่านเข้าสู่ระบบ 6 หลัก (PIN) เรียบร้อยแล้ว');
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถบันทึกรหัส PIN ได้');
+    } finally {
+      setSavingPins(false);
+    }
+  };
+
+  const handleResetDefaultPins = async () => {
+    setSavingPins(true);
+    try {
+      const updated = await updateSecurityPins(
+        DEFAULT_ADMIN_PIN_6,
+        DEFAULT_USER_PIN_6,
+        pinHashes
+      );
+      onPinHashesChanged(updated);
+      setNewAdminPin('');
+      setNewUserPin('');
+      onNotify(
+        'success',
+        `รีเซ็ตรหัส PIN เป็นค่าเริ่มต้นแล้ว (Admin: ${DEFAULT_ADMIN_PIN_6}, User: ${DEFAULT_USER_PIN_6})`
+      );
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถรีเซ็ตรหัส PIN ได้');
+    } finally {
+      setSavingPins(false);
+    }
+  };
 
   const handleConfirmClear = async () => {
     if (!clearModal) return;
@@ -328,6 +400,81 @@ export function SettingsView({
         onUsageTypesChanged={(next) => onUsageTypesChanged(next)}
         onNotify={onNotify}
       />
+    </section>
+
+    {/* 6-Digit PIN Security Configuration Section */}
+    <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              ตั้งค่ารหัสผ่านเข้าสู่ระบบ 6 หลัก (PIN)
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              กำหนดรหัสตัวเลข 6 หลัก สำหรับเข้าสู่ระบบและปลดล็อกหน้าจอ (ค่าเริ่มต้น Admin: <span className="font-mono-num font-semibold">{DEFAULT_ADMIN_PIN_6}</span> · User: <span className="font-mono-num font-semibold">{DEFAULT_USER_PIN_6}</span>)
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          disabled={savingPins}
+          onClick={() => void handleResetDefaultPins()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          <span>รีเซ็ตเป็นค่าเริ่มต้น</span>
+        </button>
+      </div>
+
+      <form onSubmit={handleSavePins} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="pin-admin-6" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              รหัส PIN ผู้ดูแลระบบ (Admin) — 6 หลัก
+            </label>
+            <input
+              id="pin-admin-6"
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              value={newAdminPin}
+              onChange={(e) => setNewAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="กรอกเลข 6 หลักใหม่ (เว้นว่างถ้าไม่เปลี่ยน)"
+              className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="pin-user-6" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              รหัส PIN ผู้ใช้งานทั่วไป (User) — 6 หลัก
+            </label>
+            <input
+              id="pin-user-6"
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              value={newUserPin}
+              onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="กรอกเลข 6 หลักใหม่ (เว้นว่างถ้าไม่เปลี่ยน)"
+              className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={savingPins || (!newAdminPin && !newUserPin)}
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-55"
+            style={{ backgroundColor: 'var(--theme-primary)' }}
+          >
+            <Save className="h-3.5 w-3.5" />
+            <span>{savingPins ? 'กำลังบันทึก...' : 'บันทึกรหัส PIN 6 หลัก'}</span>
+          </button>
+        </div>
+      </form>
     </section>
 
     {/* Data Management / Clear Data Section */}

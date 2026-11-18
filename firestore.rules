@@ -1,0 +1,273 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Reusable Security Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'banyaba@narathiwat1.go.th';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Allows verified Google UID or structured lab kiosk client ID (when Google login is skipped)
+    function isValidActorOwnerId(ownerId) {
+      return isValidId(ownerId) && (
+        (isVerifiedUser() && ownerId == request.auth.uid) ||
+        (!isSignedIn() && ownerId.matches('^lab_[a-zA-Z0-9_\\-]+$'))
+      );
+    }
+
+    function isValidClassName(cls) {
+      return cls is string && cls.size() >= 2 && cls.size() <= 20 && cls.matches('^ป\\.[1-6]/[1-3]$');
+    }
+
+    function isValidHexColor(c) {
+      return c is string && c.size() == 7 && c.matches('^#[0-9a-fA-F]{6}$');
+    }
+
+    // --- Validation Blueprints ---
+    function isValidStudent(data) {
+      return data.keys().hasAll(['number', 'name', 'className', 'ownerId', 'visibility', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['number', 'name', 'className', 'ownerId', 'visibility', 'createdAt', 'updatedAt'])
+        && (data.number == null || (data.number is int && data.number >= 1 && data.number <= 999))
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && isValidClassName(data.className)
+        && isValidId(data.ownerId)
+        && data.visibility is string && data.visibility == 'school' && data.visibility.size() <= 20
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSubject(data) {
+      return data.keys().hasAll(['name', 'code', 'note', 'ownerId', 'visibility', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['name', 'code', 'note', 'ownerId', 'visibility', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.code is string && data.code.size() <= 32
+        && data.note is string && data.note.size() <= 240
+        && isValidId(data.ownerId)
+        && data.visibility is string && data.visibility == 'school' && data.visibility.size() <= 20
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUsageLog(data) {
+      return data.keys().hasAll([
+          'date', 'timeIn', 'computerRoom', 'computerNumber',
+          'studentId', 'studentName', 'className', 'subjectId', 'subjectName',
+          'usageTypes', 'note', 'recorder', 'ownerId', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'date', 'timeIn', 'computerRoom', 'computerNumber',
+          'studentId', 'studentName', 'className', 'subjectId', 'subjectName',
+          'usageTypes', 'note', 'recorder', 'ownerId', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.date is string && data.date.size() == 10 && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.timeIn is string && data.timeIn.size() <= 10
+        && data.computerRoom is string && data.computerRoom.size() <= 32
+        && data.computerNumber is string && data.computerNumber.size() <= 16
+        && data.studentId is string && data.studentId.size() <= 128
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120
+        && isValidClassName(data.className)
+        && data.subjectId is string && data.subjectId.size() <= 128
+        && data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 120
+        && data.usageTypes is list && data.usageTypes.size() <= 30
+        && (data.usageTypes.size() == 0 || (data.usageTypes[0] is string && data.usageTypes[0].size() >= 1 && data.usageTypes[0].size() <= 100))
+        && data.note is string && data.note.size() <= 300
+        && data.recorder is string && data.recorder.size() >= 1 && data.recorder.size() <= 120
+        && isValidId(data.ownerId)
+        && data.visibility is string && data.visibility == 'school' && data.visibility.size() <= 20
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLabSettings(data) {
+      return data.keys().hasAll([
+          'schoolName', 'academicYear', 'labManager', 'colors',
+          'usageTypes', 'ownerId', 'visibility', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'schoolName', 'academicYear', 'labManager', 'colors',
+          'usageTypes', 'ownerId', 'visibility', 'updatedAt'
+        ])
+        && data.schoolName is string && data.schoolName.size() >= 1 && data.schoolName.size() <= 160
+        && data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 10
+        && data.labManager is string && data.labManager.size() >= 1 && data.labManager.size() <= 120
+        && data.colors is map
+        && data.colors.keys().hasAll(['primary', 'surface', 'text', 'accent', 'secondary'])
+        && data.colors.keys().hasOnly(['primary', 'surface', 'text', 'accent', 'secondary'])
+        && isValidHexColor(data.colors.primary)
+        && isValidHexColor(data.colors.surface)
+        && isValidHexColor(data.colors.text)
+        && isValidHexColor(data.colors.accent)
+        && isValidHexColor(data.colors.secondary)
+        && data.usageTypes is list && data.usageTypes.size() <= 50
+        && (data.usageTypes.size() == 0 || (data.usageTypes[0] is string && data.usageTypes[0].size() >= 1 && data.usageTypes[0].size() <= 100))
+        && isValidId(data.ownerId)
+        && data.visibility is string && data.visibility == 'school' && data.visibility.size() <= 20
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRole(data) {
+      return data.keys().hasAll(['email', 'createdAt'])
+        && data.keys().hasOnly(['email', 'createdAt'])
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.createdAt is timestamp;
+    }
+
+    function isValidSha256Hash(h) {
+      return h is string && h.size() == 64 && h.matches('^[a-f0-9]{64}$');
+    }
+
+    function isValidSecurityPins(data) {
+      return data.keys().hasAll(['adminPinHash', 'userPinHash', 'ownerId', 'updatedAt'])
+        && data.keys().hasOnly(['adminPinHash', 'userPinHash', 'ownerId', 'updatedAt'])
+        && isValidSha256Hash(data.adminPinHash)
+        && isValidSha256Hash(data.userPinHash)
+        && isValidId(data.ownerId)
+        && data.updatedAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // Connection health check document (accessible at startup without Google login)
+    match /test/connection {
+      allow get: if request.time != null;
+      allow list, write: if false;
+    }
+
+    // Admin UID registry (strictly isolated to verified Google admins)
+    match /admins/{uid} {
+      allow get: if isVerifiedUser() && isValidId(uid) && (request.auth.uid == uid || isBootstrappedAdmin());
+      allow list: if false;
+      allow create: if isBootstrappedAdmin() && isValidId(uid) && isValidAdminRole(incoming()) && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(uid);
+    }
+
+    // Students Roster (Shared school lab access with strict schema & timestamp enforcement)
+    match /students/{studentId} {
+      allow get: if isValidId(studentId) && (isAdmin() || existing().visibility == 'school');
+      allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
+      allow create: if isValidId(studentId)
+        && isValidStudent(incoming())
+        && isValidActorOwnerId(incoming().ownerId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(studentId)
+        && isValidStudent(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['number', 'name', 'className', 'updatedAt']);
+      allow delete: if isValidId(studentId) && (isAdmin() || existing().visibility == 'school');
+    }
+
+    // Subjects Catalog (Shared school lab access with strict schema & timestamp enforcement)
+    match /subjects/{subjectId} {
+      allow get: if isValidId(subjectId) && (isAdmin() || existing().visibility == 'school');
+      allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
+      allow create: if isValidId(subjectId)
+        && isValidSubject(incoming())
+        && isValidActorOwnerId(incoming().ownerId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(subjectId)
+        && isValidSubject(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'code', 'note', 'updatedAt']);
+      allow delete: if isValidId(subjectId) && (isAdmin() || existing().visibility == 'school');
+    }
+
+    // Computer Lab Usage Logs (Shared school lab access with strict schema & timestamp enforcement)
+    match /logs/{logId} {
+      allow get: if isValidId(logId) && (isAdmin() || existing().visibility == 'school');
+      allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
+      allow create: if isValidId(logId)
+        && isValidUsageLog(incoming())
+        && isValidActorOwnerId(incoming().ownerId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(logId)
+        && isValidUsageLog(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'date', 'timeIn', 'computerRoom', 'computerNumber',
+          'studentId', 'studentName', 'className', 'subjectId', 'subjectName',
+          'usageTypes', 'note', 'recorder', 'updatedAt'
+        ]);
+      allow delete: if isValidId(logId) && (isAdmin() || existing().visibility == 'school');
+    }
+
+    // Global Lab Settings (Single document 'app')
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId) && settingId == 'app' && (isAdmin() || existing().visibility == 'school');
+      allow list: if false;
+      allow create: if isValidId(settingId)
+        && settingId == 'app'
+        && isValidLabSettings(incoming())
+        && isValidActorOwnerId(incoming().ownerId)
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(settingId)
+        && settingId == 'app'
+        && isValidLabSettings(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'schoolName', 'academicYear', 'labManager', 'colors', 'usageTypes', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // Hashed 6-digit PIN configuration (Single document 'pins'; stores SHA-256 digests only)
+    match /security/{docId} {
+      allow get: if isValidId(docId) && docId == 'pins';
+      allow list: if false;
+      allow create: if isValidId(docId)
+        && docId == 'pins'
+        && isValidSecurityPins(incoming())
+        && isValidActorOwnerId(incoming().ownerId)
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(docId)
+        && docId == 'pins'
+        && isValidSecurityPins(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['adminPinHash', 'userPinHash', 'updatedAt']);
+      allow delete: if false;
+    }
+  }
+}

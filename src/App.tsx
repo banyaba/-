@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -14,6 +15,11 @@ import {
   Menu,
   X,
   ShieldCheck,
+  Database,
+  LogIn,
+  KeyRound,
+  Lock,
+  UserCheck,
 } from 'lucide-react';
 import {
   DEFAULT_SETTINGS,
@@ -25,8 +31,23 @@ import {
   type UsageLog,
   type UserRole,
 } from './types';
-import { api } from './api/client';
+import { auth, googleProvider } from './firebase/config';
+import {
+  checkIsAdminUser,
+  seedInitialFirestoreIfEmpty,
+  subscribeLabDatabase,
+  subscribeSecurityPins,
+} from './firebase/firestoreService';
+import {
+  DEFAULT_ADMIN_PIN_6,
+  DEFAULT_USER_PIN_6,
+  getCachedPinHashes,
+  getDefaultPinHashes,
+  verifyPin6,
+  type PinHashes,
+} from './firebase/pinAuth';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { PinCodeInput } from './components/PinCodeInput';
 import { DashboardView } from './components/DashboardView';
 import { AddDataView } from './components/AddDataView';
 import { DataTableView } from './components/DataTableView';
@@ -53,12 +74,42 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings, adminOnly: true },
 ];
 
+function formatErrorForDisplay(raw: string): string {
+  if (raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw) as { error?: string; operationType?: string; path?: string };
+      if (parsed?.error) {
+        if (parsed.error.toLowerCase().includes('permission')) {
+          return 'ไม่มีสิทธิ์ดำเนินการในส่วนนี้ หรือบัญชีไม่ได้รับอนุญาต';
+        }
+        return `ไม่สามารถเชื่อมต่อฐานข้อมูล (${parsed.error})`;
+      }
+    } catch {
+      // ignore JSON parse error
+    }
+  }
+  return raw;
+}
+
 export default function App() {
+  const [authReady, setAuthReady] = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const [sessionUnlocked, setSessionUnlocked] = useState<boolean>(() => {
+    return sessionStorage.getItem('lab_session_unlocked') === 'true';
+  });
   const [role, setRole] = useState<UserRole>(() => {
-    const saved = sessionStorage.getItem('lab_role');
-    return saved === 'admin' ? 'admin' : 'user';
+    return sessionStorage.getItem('lab_role') === 'admin' ? 'admin' : 'user';
   });
   const [adminModalOpen, setAdminModalOpen] = useState(false);
+
+  const [pinHashes, setPinHashes] = useState<PinHashes | null>(() => getCachedPinHashes());
+  const [loginMethod, setLoginMethod] = useState<'pin6' | 'google'>('pin6');
+  const [pinInput, setPinInput] = useState('');
+  const [pinVerifying, setPinVerifying] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('lab_dark_mode') === 'true';
@@ -81,7 +132,8 @@ export default function App() {
 
   const notify = useCallback((type: 'success' | 'error', message: string) => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    setToasts((prev) => [...prev, { id, type, message }]);
+    const cleanMessage = type === 'error' ? formatErrorForDisplay(message) : message;
+    setToasts((prev) => [...prev, { id, type, message: cleanMessage }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3600);
@@ -117,26 +169,126 @@ export default function App() {
     }
   }, [settings.colors, darkMode]);
 
-  const loadDatabase = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const data = await api.bootstrap();
-      setStudents(data.students);
-      setSubjects(data.subjects);
-      setLogs(data.logs);
-      setUsageTypes(data.usageTypes || [...DEFAULT_USAGE_TYPES]);
-      setSettings(data.settings);
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'ไม่สามารถโหลดข้อมูลระบบได้');
-    } finally {
-      setLoading(false);
+  // Ensure default PIN hashes are resolved when cache is empty
+  useEffect(() => {
+    if (!pinHashes) {
+      void getDefaultPinHashes().then((defaults) => setPinHashes(defaults));
     }
+  }, [pinHashes]);
+
+  // Listen to optional Firebase Auth state (never blocks direct Firestore connection)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        try {
+          const adminFlag = await checkIsAdminUser(user);
+          if (adminFlag && sessionStorage.getItem('lab_google_login') === '1') {
+            sessionStorage.removeItem('lab_google_login');
+            sessionStorage.setItem('lab_role', 'admin');
+            sessionStorage.setItem('lab_session_unlocked', 'true');
+            setRole('admin');
+            setSessionUnlocked(true);
+          } else if (sessionStorage.getItem('lab_google_login') === '1') {
+            sessionStorage.removeItem('lab_google_login');
+            sessionStorage.setItem('lab_role', 'user');
+            sessionStorage.setItem('lab_session_unlocked', 'true');
+            setRole('user');
+            setSessionUnlocked(true);
+          }
+        } catch {
+          // Ignore optional Google admin lookup errors
+        }
+      }
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
   }, []);
 
+  // Subscribe to custom 6-digit PIN hashes from Firestore immediately (no Google login required)
   useEffect(() => {
-    loadDatabase();
-  }, [loadDatabase]);
+    if (!authReady) return;
+    const unsubPins = subscribeSecurityPins((hashes) => {
+      setPinHashes(hashes);
+    });
+    return () => unsubPins();
+  }, [authReady]);
+
+  // Seed initial data if empty & attach real-time Firestore listeners directly without requiring Google sign-in
+  useEffect(() => {
+    if (!authReady) return;
+
+    let active = true;
+    let unsubscribeDb: (() => void) | null = null;
+    setLoading(true);
+    setLoadError(null);
+
+    const startSync = async () => {
+      try {
+        await seedInitialFirestoreIfEmpty();
+        if (!active) return;
+
+        let loadedSettings = false;
+        let loadedStudents = false;
+        let loadedSubjects = false;
+        let loadedLogs = false;
+
+        const maybeFinishLoading = () => {
+          if (loadedSettings && loadedStudents && loadedSubjects && loadedLogs) {
+            setLoading(false);
+          }
+        };
+
+        unsubscribeDb = subscribeLabDatabase({
+          onSettings: (nextSettings, nextUsageTypes) => {
+            if (!active) return;
+            setSettings(nextSettings);
+            setUsageTypes(nextUsageTypes);
+            loadedSettings = true;
+            maybeFinishLoading();
+          },
+          onStudents: (nextStudents) => {
+            if (!active) return;
+            setStudents(nextStudents);
+            loadedStudents = true;
+            maybeFinishLoading();
+          },
+          onSubjects: (nextSubjects) => {
+            if (!active) return;
+            setSubjects(nextSubjects);
+            loadedSubjects = true;
+            maybeFinishLoading();
+          },
+          onLogs: (nextLogs) => {
+            if (!active) return;
+            setLogs(nextLogs);
+            loadedLogs = true;
+            maybeFinishLoading();
+          },
+          onError: (err) => {
+            if (!active) return;
+            setLoadError(formatErrorForDisplay(err.message));
+            setLoading(false);
+          },
+        });
+      } catch (err) {
+        if (!active) return;
+        setLoadError(
+          formatErrorForDisplay(
+            err instanceof Error ? err.message : 'ไม่สามารถเชื่อมต่อฐานข้อมูล Firebase ได้'
+          )
+        );
+        setLoading(false);
+      }
+    };
+
+    void startSync();
+
+    return () => {
+      active = false;
+      if (unsubscribeDb) unsubscribeDb();
+    };
+  }, [authReady]);
 
   const visibleNavItems = useMemo(() => {
     if (role === 'admin') return NAV_ITEMS;
@@ -153,15 +305,113 @@ export default function App() {
     }
   }, [role, activePage]);
 
+  const handleGoogleSignIn = async () => {
+    setSigningIn(true);
+    setAuthError(null);
+    try {
+      sessionStorage.setItem('lab_google_login', '1');
+      await signInWithPopup(auth, googleProvider);
+      notify('success', 'เข้าสู่ระบบด้วยบัญชี Google สำเร็จ');
+    } catch (err) {
+      sessionStorage.removeItem('lab_google_login');
+      const msg = err instanceof Error ? err.message : 'ไม่สามารถเข้าสู่ระบบ Google ได้';
+      if (msg.includes('popup-closed-by-user')) {
+        setAuthError('ยกเลิกการเข้าสู่ระบบ กรุณากดเข้าสู่ระบบด้วย Google อีกครั้ง');
+      } else {
+        setAuthError(msg);
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  const handlePin6Login = async (candidatePin: string) => {
+    if (pinVerifying) return;
+    if (candidatePin.length !== 6) {
+      setPinError('กรุณากรอกตัวเลขให้ครบ 6 หลัก');
+      return;
+    }
+
+    setPinVerifying(true);
+    setPinError(null);
+    setAuthError(null);
+
+    try {
+      const matchedRole = await verifyPin6(candidatePin, pinHashes);
+      if (!matchedRole) {
+        setPinError('รหัสตัวเลข 6 หลักไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง');
+        setPinInput('');
+        return;
+      }
+
+      sessionStorage.setItem('lab_role', matchedRole);
+      sessionStorage.setItem('lab_session_unlocked', 'true');
+      setRole(matchedRole);
+      setSessionUnlocked(true);
+      setPinInput('');
+      setPinError(null);
+      notify(
+        'success',
+        matchedRole === 'admin'
+          ? 'เข้าสู่ระบบด้วยเลข 6 หลัก (Admin) สำเร็จ'
+          : 'เข้าสู่ระบบด้วยเลข 6 หลัก (User) สำเร็จ'
+      );
+    } catch (err) {
+      setPinError(err instanceof Error ? err.message : 'ไม่สามารถตรวจสอบรหัสได้');
+    } finally {
+      setPinVerifying(false);
+    }
+  };
+
+  const handlePasswordlessUserEnter = () => {
+    setPinError(null);
+    setAuthError(null);
+    sessionStorage.setItem('lab_role', 'user');
+    sessionStorage.setItem('lab_session_unlocked', 'true');
+    setRole('user');
+    setSessionUnlocked(true);
+    setPinInput('');
+    notify('success', 'เข้าใช้งานในสิทธิ์ผู้ใช้งานทั่วไป (User) สำเร็จ');
+  };
+
+  const handleLockScreen = () => {
+    sessionStorage.removeItem('lab_session_unlocked');
+    setPinInput('');
+    setPinError(null);
+    setAuthError(null);
+    setLoginMethod('pin6');
+    setMobileMenuOpen(false);
+    setSessionUnlocked(false);
+  };
+
+  const handleGoogleSignOut = async () => {
+    try {
+      sessionStorage.removeItem('lab_role');
+      sessionStorage.removeItem('lab_session_unlocked');
+      sessionStorage.removeItem('lab_google_login');
+      setSessionUnlocked(false);
+      setPinInput('');
+      setPinError(null);
+      await signOut(auth);
+      setEditingLog(null);
+      setMobileMenuOpen(false);
+      notify('success', 'ออกจากระบบบัญชี Google เรียบร้อยแล้ว');
+    } catch (err) {
+      notify('error', err instanceof Error ? err.message : 'ไม่สามารถออกจากระบบได้');
+    }
+  };
+
   const handleSwitchToAdmin = () => {
     sessionStorage.setItem('lab_role', 'admin');
+    sessionStorage.setItem('lab_session_unlocked', 'true');
     setRole('admin');
+    setSessionUnlocked(true);
     setAdminModalOpen(false);
     notify('success', 'เข้าสู่ระบบในสิทธิ์ผู้ดูแลระบบ (Admin) สำเร็จ');
   };
 
   const handleExitAdmin = () => {
-    sessionStorage.removeItem('lab_role');
+    sessionStorage.setItem('lab_role', 'user');
     setRole('user');
     setEditingLog(null);
     setMobileMenuOpen(false);
@@ -177,6 +427,173 @@ export default function App() {
   };
 
   const currentNav = NAV_ITEMS.find((i) => i.id === activePage) || NAV_ITEMS[0];
+
+  // Wait for initial Firebase readiness
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
+        <div className="flex flex-col items-center gap-3 text-slate-600 dark:text-slate-300">
+          <div className="h-9 w-9 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+          <span className="text-sm font-medium">กำลังเชื่อมต่อฐานข้อมูล Firebase...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Login / Lock Screen (6-digit PIN + Passwordless User entry + Optional Google Sign-In)
+  if (!sessionUnlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-7 shadow-lg space-y-5">
+          <div className="flex items-center gap-3.5">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white"
+              style={{ backgroundColor: 'var(--theme-primary)' }}
+            >
+              <Monitor className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 truncate">
+                ระบบบันทึกการใช้ห้องคอมพิวเตอร์
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                เชื่อมต่อฐานข้อมูล Cloud Firestore โดยตรง (ไม่ต้องใช้บัญชี Google)
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMethod('pin6');
+                setAuthError(null);
+              }}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all ${
+                loginMethod === 'pin6'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              <span>เลข 6 หลัก (PIN)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMethod('google');
+                setPinError(null);
+              }}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all ${
+                loginMethod === 'google'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              <span>Google (ไม่บังคับ)</span>
+            </button>
+          </div>
+
+          {loginMethod === 'pin6' ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handlePin6Login(pinInput);
+              }}
+              className="space-y-4"
+            >
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 px-3.5 py-2.5 text-[11px] text-slate-600 dark:text-slate-300 flex flex-wrap items-center justify-between gap-2">
+                <span>รหัสเริ่มต้น</span>
+                <span className="font-mono-num">
+                  Admin: <strong>{DEFAULT_ADMIN_PIN_6}</strong> · User: <strong>{DEFAULT_USER_PIN_6}</strong>
+                </span>
+              </div>
+
+              <PinCodeInput
+                value={pinInput}
+                onChange={(next) => {
+                  setPinInput(next);
+                  setPinError(null);
+                }}
+                onComplete={(completed) => {
+                  void handlePin6Login(completed);
+                }}
+                disabled={pinVerifying}
+                autoFocus
+                label="กรอกรหัสเข้าสู่ระบบ 6 หลัก"
+              />
+
+              {pinError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/50 px-3.5 py-2.5 text-xs font-medium text-rose-700 dark:text-rose-300 text-center"
+                >
+                  {pinError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={pinVerifying || pinInput.length !== 6}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-55"
+                style={{ backgroundColor: 'var(--theme-primary)' }}
+              >
+                <KeyRound className="h-4 w-4" />
+                <span>{pinVerifying ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบด้วยเลข 6 หลัก'}</span>
+              </button>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={pinVerifying}
+                  onClick={handlePasswordlessUserEnter}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-55 transition-colors"
+                >
+                  <UserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>เข้าใช้งานทั่วไป (User) โดยไม่ต้องใส่รหัส</span>
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 p-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
+                  <Database className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span>เชื่อมต่อบัญชี Google (ตัวเลือกเสริม)</span>
+                </div>
+                <p className="leading-relaxed">
+                  ระบบสามารถเชื่อมต่อ Cloud Firestore ได้ทันทีด้วยรหัส 6 หลักหรือสิทธิ์ User โดยไม่ต้องยืนยันบัญชี Google หรือเลือกเข้าสู่ระบบด้วย Google เพิ่มเติมได้ที่นี่
+                </p>
+              </div>
+
+              {authError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/50 px-4 py-3 text-xs font-medium text-rose-700 dark:text-rose-300"
+                >
+                  {authError}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => void handleGoogleSignIn()}
+                disabled={signingIn}
+                className="w-full inline-flex items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-60"
+                style={{ backgroundColor: 'var(--theme-primary)' }}
+              >
+                <LogIn className="h-4 w-4" />
+                <span>{signingIn ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบด้วย Google'}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-[var(--theme-text)] transition-colors">
@@ -252,19 +669,25 @@ export default function App() {
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
           <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
-            <div className="font-medium text-slate-700 dark:text-slate-200">
+            <div className="font-medium text-slate-700 dark:text-slate-200 truncate">
+              {firebaseUser?.displayName ||
+                firebaseUser?.email ||
+                (role === 'admin' ? 'ผู้ดูแลระบบห้องคอมพิวเตอร์' : 'ผู้ใช้งานทั่วไป (User)')}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">
               สิทธิ์: {role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ผู้ใช้งานทั่วไป (User)'}
             </div>
             <div>ปีการศึกษา {settings.academicYear}</div>
           </div>
+
           {role === 'admin' ? (
             <button
               type="button"
               onClick={handleExitAdmin}
               className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>ออกจากสิทธิ์ Admin</span>
+              <ShieldCheck className="h-3.5 w-3.5 text-slate-500" />
+              <span>สลับเป็นสิทธิ์ User</span>
             </button>
           ) : (
             <button
@@ -277,6 +700,26 @@ export default function App() {
             >
               <ShieldCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
               <span>เข้าสู่ระบบ Admin</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleLockScreen}
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            <Lock className="h-3.5 w-3.5" />
+            <span>ล็อกหน้าจอ (รหัส 6 หลัก)</span>
+          </button>
+
+          {firebaseUser && (
+            <button
+              type="button"
+              onClick={handleGoogleSignOut}
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>ออกจากระบบ Google</span>
             </button>
           )}
         </div>
@@ -368,7 +811,7 @@ export default function App() {
               <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{loadError}</p>
               <button
                 type="button"
-                onClick={loadDatabase}
+                onClick={() => window.location.reload()}
                 className="mt-4 rounded-lg px-4 py-2 text-sm font-medium text-white"
                 style={{ backgroundColor: 'var(--theme-primary)' }}
               >
@@ -451,6 +894,7 @@ export default function App() {
                 <SettingsView
                   settings={settings}
                   usageTypes={usageTypes}
+                  pinHashes={pinHashes}
                   counts={{
                     logs: logs.length,
                     students: students.length,
@@ -458,6 +902,7 @@ export default function App() {
                   }}
                   onSettingsUpdated={setSettings}
                   onUsageTypesChanged={setUsageTypes}
+                  onPinHashesChanged={setPinHashes}
                   onClearLogsOnly={() => setLogs([])}
                   onClearAllData={() => {
                     setLogs([]);
@@ -474,6 +919,7 @@ export default function App() {
 
       <AdminLoginModal
         open={adminModalOpen}
+        pinHashes={pinHashes}
         onClose={() => setAdminModalOpen(false)}
         onSuccess={handleSwitchToAdmin}
       />
