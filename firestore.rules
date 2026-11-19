@@ -191,11 +191,26 @@ service cloud.firestore {
       return h is string && h.size() == 64 && h.matches('^[a-f0-9]{64}$');
     }
 
+    function isValidExtraAdminEntry(entry) {
+      return entry is map
+        && entry.keys().hasAll(['id', 'name', 'pinHash', 'updatedAt'])
+        && entry.keys().hasOnly(['id', 'name', 'pinHash', 'updatedAt'])
+        && isValidId(entry.id)
+        && entry.name is string && entry.name.size() >= 1 && entry.name.size() <= 120
+        && isValidSha256Hash(entry.pinHash)
+        && entry.updatedAt is string && entry.updatedAt.size() >= 10 && entry.updatedAt.size() <= 40;
+    }
+
     function isValidSecurityPins(data) {
       return data.keys().hasAll(['adminPinHash', 'userPinHash', 'ownerId', 'updatedAt'])
-        && data.keys().hasOnly(['adminPinHash', 'userPinHash', 'ownerId', 'updatedAt'])
+        && data.keys().hasOnly(['adminPinHash', 'userPinHash', 'extraAdmins', 'ownerId', 'updatedAt'])
         && isValidSha256Hash(data.adminPinHash)
         && isValidSha256Hash(data.userPinHash)
+        && (!('extraAdmins' in data) || (
+          data.extraAdmins is list
+          && data.extraAdmins.size() <= 4
+          && (data.extraAdmins.size() == 0 || isValidExtraAdminEntry(data.extraAdmins[0]))
+        ))
         && isValidId(data.ownerId)
         && data.updatedAt is timestamp;
     }
@@ -281,7 +296,7 @@ service cloud.firestore {
 
     // Students Roster (Shared school lab access with strict schema & timestamp enforcement)
     match /students/{studentId} {
-      allow get: if isValidId(studentId) && (isAdmin() || existing().visibility == 'school');
+      allow get: if isValidId(studentId) && (resource == null || isAdmin() || existing().visibility == 'school');
       allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
       allow create: if isValidId(studentId)
         && isValidStudent(incoming())
@@ -299,7 +314,7 @@ service cloud.firestore {
 
     // Subjects Catalog (Shared school lab access with strict schema & timestamp enforcement)
     match /subjects/{subjectId} {
-      allow get: if isValidId(subjectId) && (isAdmin() || existing().visibility == 'school');
+      allow get: if isValidId(subjectId) && (resource == null || isAdmin() || existing().visibility == 'school');
       allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
       allow create: if isValidId(subjectId)
         && isValidSubject(incoming())
@@ -317,7 +332,7 @@ service cloud.firestore {
 
     // Computer Lab Usage Logs (Shared school lab access with strict schema & timestamp enforcement)
     match /logs/{logId} {
-      allow get: if isValidId(logId) && (isAdmin() || existing().visibility == 'school');
+      allow get: if isValidId(logId) && (resource == null || isAdmin() || existing().visibility == 'school');
       allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
       allow create: if isValidId(logId)
         && isValidUsageLog(incoming())
@@ -339,7 +354,7 @@ service cloud.firestore {
 
     // Global Lab Settings (Single document 'app')
     match /settings/{settingId} {
-      allow get: if isValidId(settingId) && settingId == 'app' && (isAdmin() || existing().visibility == 'school');
+      allow get: if isValidId(settingId) && settingId == 'app' && (resource == null || isAdmin() || existing().visibility == 'school');
       allow list: if false;
       allow create: if isValidId(settingId)
         && settingId == 'app'
@@ -371,13 +386,13 @@ service cloud.firestore {
         && isValidSecurityPins(incoming())
         && incoming().ownerId == existing().ownerId
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['adminPinHash', 'userPinHash', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['adminPinHash', 'userPinHash', 'extraAdmins', 'updatedAt']);
       allow delete: if false;
     }
 
-    // Computer Lab Room Bookings (Anyone can request a booking; only Admin can approve/reject)
+    // Computer Lab Room Bookings (Anyone can request a booking; Admin via Google or PIN can approve/reject)
     match /bookings/{bookingId} {
-      allow get: if isValidId(bookingId) && (isAdmin() || existing().visibility == 'school');
+      allow get: if isValidId(bookingId) && (resource == null || isAdmin() || existing().visibility == 'school');
       allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
       allow create: if isValidId(bookingId)
         && isValidRoomBooking(incoming())
@@ -392,29 +407,29 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
       allow update: if isValidId(bookingId)
         && isValidRoomBooking(incoming())
-        && (isAdmin() || !isSignedIn())
+        && (isAdmin() || isVerifiedUser() || !isSignedIn())
         && incoming().ownerId == existing().ownerId
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly([
           'status', 'decisionNote', 'decidedBy', 'updatedAt'
         ]);
-      allow delete: if isValidId(bookingId) && (isAdmin() || (!isSignedIn() && existing().visibility == 'school'));
+      allow delete: if isValidId(bookingId) && (isAdmin() || ((isVerifiedUser() || !isSignedIn()) && existing().visibility == 'school'));
     }
 
-    // Weekly Mon-Fri Computer Lab Teaching Schedules (Readable by all; manageable by Admin)
+    // Weekly Mon-Fri Computer Lab Teaching Schedules (Readable by all; manageable by Admin via Google or PIN)
     match /teachingSchedules/{slotId} {
-      allow get: if isValidId(slotId) && (isAdmin() || existing().visibility == 'school');
+      allow get: if isValidId(slotId) && (resource == null || isAdmin() || existing().visibility == 'school');
       allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
       allow create: if isValidId(slotId)
         && isValidTeachingSchedule(incoming())
-        && (isAdmin() || !isSignedIn())
+        && (isAdmin() || isVerifiedUser() || !isSignedIn())
         && isValidActorOwnerId(incoming().ownerId)
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
       allow update: if isValidId(slotId)
         && isValidTeachingSchedule(incoming())
-        && (isAdmin() || !isSignedIn())
+        && (isAdmin() || isVerifiedUser() || !isSignedIn())
         && incoming().ownerId == existing().ownerId
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
@@ -422,7 +437,7 @@ service cloud.firestore {
           'computerRoom', 'dayOfWeek', 'period', 'startTime', 'endTime',
           'className', 'subjectName', 'teacherName', 'note', 'updatedAt'
         ]);
-      allow delete: if isValidId(slotId) && (isAdmin() || (!isSignedIn() && existing().visibility == 'school'));
+      allow delete: if isValidId(slotId) && (isAdmin() || ((isVerifiedUser() || !isSignedIn()) && existing().visibility == 'school'));
     }
   }
 }

@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, X, Lock } from 'lucide-react';
 import { PinCodeInput } from './PinCodeInput';
-import { verifyAdminPin6, type PinHashes } from '../firebase/pinAuth';
+import { verifyAdminPin6Detailed, type PinHashes } from '../firebase/pinAuth';
 
 interface AdminLoginModalProps {
   open: boolean;
   pinHashes: PinHashes | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (adminInfo?: { adminId?: string; adminName?: string }) => void;
 }
 
 export function AdminLoginModal({ open, pinHashes, onClose, onSuccess }: AdminLoginModalProps) {
@@ -29,11 +29,11 @@ export function AdminLoginModal({ open, pinHashes, onClose, onSuccess }: AdminLo
     if (verifying) return;
     setVerifying(true);
     try {
-      const ok = await verifyAdminPin6(candidate, pinHashes);
-      if (ok) {
+      const res = await verifyAdminPin6Detailed(candidate, pinHashes);
+      if (res.ok) {
         setError('');
         setPin('');
-        onSuccess();
+        onSuccess({ adminId: res.adminId, adminName: res.adminName });
         return;
       }
       setError('รหัส PIN 6 หลักผู้ดูแลระบบไม่ถูกต้อง');

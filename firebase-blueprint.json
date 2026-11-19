@@ -311,6 +311,10 @@
           "pattern": "^[a-f0-9]{64}$",
           "description": "SHA-256 hex digest of the 6-digit User PIN."
         },
+        "extraAdmins": {
+          "type": "array",
+          "description": "Additional administrator 6-digit PIN entries (id, name, pinHash, updatedAt, max 4)."
+        },
         "ownerId": {
           "type": "string",
           "minLength": 1,

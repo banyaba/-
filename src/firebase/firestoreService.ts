@@ -50,7 +50,9 @@ import {
   getDefaultPinHashes,
   hashPin6,
   isValidPin6,
+  sanitizeExtraAdmins,
   setCachedPinHashes,
+  type ExtraAdminPin,
   type PinHashes,
 } from './pinAuth';
 
@@ -1796,6 +1798,7 @@ export function subscribeSecurityPins(
           const hashes: PinHashes = {
             adminPinHash: data.adminPinHash,
             userPinHash: data.userPinHash,
+            extraAdmins: sanitizeExtraAdmins(data.extraAdmins),
           };
           setCachedPinHashes(hashes);
           onPins(hashes);
@@ -1816,12 +1819,51 @@ export function subscribeSecurityPins(
   );
 }
 
+async function persistSecurityPinsDoc(nextHashes: PinHashes): Promise<PinHashes> {
+  const uid = getActorUid();
+  const extraAdmins = sanitizeExtraAdmins(nextHashes.extraAdmins);
+  const path = 'security/pins';
+  const ref = doc(db, 'security', 'pins');
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await updateDoc(ref, {
+        adminPinHash: nextHashes.adminPinHash,
+        userPinHash: nextHashes.userPinHash,
+        extraAdmins,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      await setDoc(ref, {
+        adminPinHash: nextHashes.adminPinHash,
+        userPinHash: nextHashes.userPinHash,
+        extraAdmins,
+        ownerId: uid,
+        updatedAt: serverTimestamp(),
+      });
+    }
+    const normalized: PinHashes = {
+      adminPinHash: nextHashes.adminPinHash,
+      userPinHash: nextHashes.userPinHash,
+      extraAdmins,
+    };
+    setCachedPinHashes(normalized);
+    return normalized;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
 export async function updateSecurityPins(
   adminPin6: string | null,
   userPin6: string | null,
-  currentHashes?: PinHashes | null
+  currentHashes?: PinHashes | null,
+  actorAdminId?: string
 ): Promise<PinHashes> {
-  const uid = getActorUid();
+  getActorUid();
+  if (actorAdminId) {
+    throw new Error('ผู้ดูแลระบบเพิ่มเติมไม่มีสิทธิ์แก้ไขรหัส PIN หลักหรือรหัสของผู้อื่น');
+  }
   if (adminPin6 !== null && !isValidPin6(adminPin6)) {
     throw new Error('รหัส PIN ผู้ดูแลระบบต้องเป็นตัวเลข 6 หลัก');
   }
@@ -1830,38 +1872,144 @@ export async function updateSecurityPins(
   }
 
   const base = currentHashes ?? (await getDefaultPinHashes());
+  const extraAdmins = sanitizeExtraAdmins(base.extraAdmins);
   const nextAdminHash = adminPin6 !== null ? await hashPin6(adminPin6) : base.adminPinHash;
   const nextUserHash = userPin6 !== null ? await hashPin6(userPin6) : base.userPinHash;
 
   if (nextAdminHash === nextUserHash) {
     throw new Error('รหัส PIN 6 หลักของ Admin และ User ต้องไม่ซ้ำกัน');
   }
-
-  const path = 'security/pins';
-  const ref = doc(db, 'security', 'pins');
-  try {
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      await updateDoc(ref, {
-        adminPinHash: nextAdminHash,
-        userPinHash: nextUserHash,
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      await setDoc(ref, {
-        adminPinHash: nextAdminHash,
-        userPinHash: nextUserHash,
-        ownerId: uid,
-        updatedAt: serverTimestamp(),
-      });
-    }
-    const nextHashes: PinHashes = {
-      adminPinHash: nextAdminHash,
-      userPinHash: nextUserHash,
-    };
-    setCachedPinHashes(nextHashes);
-    return nextHashes;
-  } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, path);
+  if (extraAdmins.some((a) => a.pinHash === nextAdminHash || a.pinHash === nextUserHash)) {
+    throw new Error('รหัส PIN 6 หลักนี้ซ้ำกับรหัสของผู้ดูแลระบบเพิ่มเติมที่มีอยู่แล้ว');
   }
+
+  return persistSecurityPinsDoc({
+    adminPinHash: nextAdminHash,
+    userPinHash: nextUserHash,
+    extraAdmins,
+  });
+}
+
+export async function addExtraAdminPin(
+  name: string,
+  pin6: string,
+  currentHashes?: PinHashes | null,
+  actorAdminId?: string
+): Promise<PinHashes> {
+  getActorUid();
+  if (actorAdminId) {
+    throw new Error('เฉพาะผู้ดูแลระบบหลักเท่านั้นที่สามารถเพิ่มผู้ดูแลระบบเพิ่มเติมได้');
+  }
+  const cleanName = clampString(name, LIMITS.NAME_MAX);
+  if (!cleanName) {
+    throw new Error('กรุณาระบุชื่อผู้ดูแลระบบ');
+  }
+  if (!isValidPin6(pin6)) {
+    throw new Error('รหัส PIN ใหม่ต้องเป็นตัวเลข 6 หลัก');
+  }
+
+  const base = currentHashes ?? (await getDefaultPinHashes());
+  const extraAdmins = sanitizeExtraAdmins(base.extraAdmins);
+  if (extraAdmins.length >= 4) {
+    throw new Error('สามารถเพิ่มผู้ดูแลระบบเพิ่มเติมได้สูงสุด 4 คน');
+  }
+
+  const pinHash = await hashPin6(pin6);
+  if (
+    pinHash === base.adminPinHash ||
+    pinHash === base.userPinHash ||
+    extraAdmins.some((a) => a.pinHash === pinHash)
+  ) {
+    throw new Error('รหัส PIN 6 หลักนี้ถูกใช้งานแล้ว กรุณาตั้งรหัสใหม่ไม่ให้ซ้ำกัน');
+  }
+
+  const newEntry: ExtraAdminPin = {
+    id: generateId('adm'),
+    name: cleanName,
+    pinHash,
+    updatedAt: new Date().toISOString(),
+  };
+
+  return persistSecurityPinsDoc({
+    adminPinHash: base.adminPinHash,
+    userPinHash: base.userPinHash,
+    extraAdmins: [...extraAdmins, newEntry],
+  });
+}
+
+export async function updateExtraAdminPin(
+  id: string,
+  name: string,
+  newPin6: string | null,
+  currentHashes?: PinHashes | null,
+  actorAdminId?: string
+): Promise<PinHashes> {
+  getActorUid();
+  const safeId = sanitizeId(id);
+  if (!safeId) throw new Error('รหัสอ้างอิงผู้ดูแลระบบไม่ถูกต้อง');
+  if (actorAdminId && actorAdminId !== safeId) {
+    throw new Error('ผู้ดูแลระบบเพิ่มเติมไม่สามารถดูหรือแก้ไขรหัสผ่านของผู้ดูแลระบบคนอื่นได้');
+  }
+  const cleanName = clampString(name, LIMITS.NAME_MAX);
+  if (!cleanName) {
+    throw new Error('กรุณาระบุชื่อผู้ดูแลระบบ');
+  }
+  if (newPin6 !== null && !isValidPin6(newPin6)) {
+    throw new Error('รหัส PIN ใหม่ต้องเป็นตัวเลข 6 หลัก');
+  }
+
+  const base = currentHashes ?? (await getDefaultPinHashes());
+  const extraAdmins = sanitizeExtraAdmins(base.extraAdmins);
+  const existing = extraAdmins.find((a) => a.id === safeId);
+  if (!existing) {
+    throw new Error('ไม่พบข้อมูลผู้ดูแลระบบที่ต้องการแก้ไข');
+  }
+
+  const nextPinHash = newPin6 !== null ? await hashPin6(newPin6) : existing.pinHash;
+  if (
+    nextPinHash === base.adminPinHash ||
+    nextPinHash === base.userPinHash ||
+    extraAdmins.some((a) => a.id !== safeId && a.pinHash === nextPinHash)
+  ) {
+    throw new Error('รหัส PIN 6 หลักนี้ถูกใช้งานแล้ว กรุณาใช้รหัสอื่น');
+  }
+
+  const nextExtraAdmins = extraAdmins.map((a) =>
+    a.id === safeId
+      ? {
+          ...a,
+          name: cleanName,
+          pinHash: nextPinHash,
+          updatedAt: new Date().toISOString(),
+        }
+      : a
+  );
+
+  return persistSecurityPinsDoc({
+    adminPinHash: base.adminPinHash,
+    userPinHash: base.userPinHash,
+    extraAdmins: nextExtraAdmins,
+  });
+}
+
+export async function deleteExtraAdminPin(
+  id: string,
+  currentHashes?: PinHashes | null,
+  actorAdminId?: string
+): Promise<PinHashes> {
+  getActorUid();
+  if (actorAdminId) {
+    throw new Error('เฉพาะผู้ดูแลระบบหลักเท่านั้นที่สามารถลบผู้ดูแลระบบเพิ่มเติมได้');
+  }
+  const safeId = sanitizeId(id);
+  if (!safeId) throw new Error('รหัสอ้างอิงผู้ดูแลระบบไม่ถูกต้อง');
+
+  const base = currentHashes ?? (await getDefaultPinHashes());
+  const extraAdmins = sanitizeExtraAdmins(base.extraAdmins);
+
+  return persistSecurityPinsDoc({
+    adminPinHash: base.adminPinHash,
+    userPinHash: base.userPinHash,
+    extraAdmins: extraAdmins.filter((a) => a.id !== safeId),
+  });
 }

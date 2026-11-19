@@ -46,7 +46,7 @@ import {
 import {
   getCachedPinHashes,
   getDefaultPinHashes,
-  verifyPin6,
+  verifyPin6Detailed,
   type PinHashes,
 } from './firebase/pinAuth';
 import { AdminLoginModal } from './components/AdminLoginModal';
@@ -180,6 +180,12 @@ export default function App() {
   const [role, setRole] = useState<UserRole>(() => {
     return sessionStorage.getItem('lab_role') === 'admin' ? 'admin' : 'user';
   });
+  const [activeAdminId, setActiveAdminId] = useState<string>(() => {
+    return sessionStorage.getItem('lab_admin_id') || '';
+  });
+  const [activeAdminName, setActiveAdminName] = useState<string>(() => {
+    return sessionStorage.getItem('lab_admin_name') || '';
+  });
   const [adminModalOpen, setAdminModalOpen] = useState(false);
 
   const [pinHashes, setPinHashes] = useState<PinHashes | null>(() => getCachedPinHashes());
@@ -267,12 +273,20 @@ export default function App() {
             sessionStorage.removeItem('lab_google_login');
             sessionStorage.setItem('lab_role', 'admin');
             sessionStorage.setItem('lab_session_unlocked', 'true');
+            sessionStorage.removeItem('lab_admin_id');
+            sessionStorage.removeItem('lab_admin_name');
+            setActiveAdminId('');
+            setActiveAdminName('');
             setRole('admin');
             setSessionUnlocked(true);
           } else if (sessionStorage.getItem('lab_google_login') === '1') {
             sessionStorage.removeItem('lab_google_login');
             sessionStorage.setItem('lab_role', 'user');
             sessionStorage.setItem('lab_session_unlocked', 'true');
+            sessionStorage.removeItem('lab_admin_id');
+            sessionStorage.removeItem('lab_admin_name');
+            setActiveAdminId('');
+            setActiveAdminName('');
             setRole('user');
             setSessionUnlocked(true);
           }
@@ -430,23 +444,36 @@ export default function App() {
     setAuthError(null);
 
     try {
-      const matchedRole = await verifyPin6(candidatePin, pinHashes);
-      if (!matchedRole) {
+      const matched = await verifyPin6Detailed(candidatePin, pinHashes);
+      if (!matched) {
         setPinError('รหัสตัวเลข 6 หลักไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง');
         setPinInput('');
         return;
       }
 
-      sessionStorage.setItem('lab_role', matchedRole);
+      sessionStorage.setItem('lab_role', matched.role);
       sessionStorage.setItem('lab_session_unlocked', 'true');
-      setRole(matchedRole);
+      if (matched.role === 'admin' && matched.adminId && matched.adminName) {
+        sessionStorage.setItem('lab_admin_id', matched.adminId);
+        sessionStorage.setItem('lab_admin_name', matched.adminName);
+        setActiveAdminId(matched.adminId);
+        setActiveAdminName(matched.adminName);
+      } else {
+        sessionStorage.removeItem('lab_admin_id');
+        sessionStorage.removeItem('lab_admin_name');
+        setActiveAdminId('');
+        setActiveAdminName('');
+      }
+      setRole(matched.role);
       setSessionUnlocked(true);
       setPinInput('');
       setPinError(null);
       notify(
         'success',
-        matchedRole === 'admin'
-          ? 'เข้าสู่ระบบด้วยเลข 6 หลัก (Admin) สำเร็จ'
+        matched.role === 'admin'
+          ? matched.adminName
+            ? `เข้าสู่ระบบ Admin (${matched.adminName}) สำเร็จ`
+            : 'เข้าสู่ระบบด้วยเลข 6 หลัก (Admin) สำเร็จ'
           : 'เข้าสู่ระบบด้วยเลข 6 หลัก (User) สำเร็จ'
       );
     } catch (err) {
@@ -461,6 +488,10 @@ export default function App() {
     setAuthError(null);
     sessionStorage.setItem('lab_role', 'user');
     sessionStorage.setItem('lab_session_unlocked', 'true');
+    sessionStorage.removeItem('lab_admin_id');
+    sessionStorage.removeItem('lab_admin_name');
+    setActiveAdminId('');
+    setActiveAdminName('');
     setRole('user');
     setSessionUnlocked(true);
     setPinInput('');
@@ -482,6 +513,10 @@ export default function App() {
       sessionStorage.removeItem('lab_role');
       sessionStorage.removeItem('lab_session_unlocked');
       sessionStorage.removeItem('lab_google_login');
+      sessionStorage.removeItem('lab_admin_id');
+      sessionStorage.removeItem('lab_admin_name');
+      setActiveAdminId('');
+      setActiveAdminName('');
       setSessionUnlocked(false);
       setPinInput('');
       setPinError(null);
@@ -494,17 +529,37 @@ export default function App() {
     }
   };
 
-  const handleSwitchToAdmin = () => {
+  const handleSwitchToAdmin = (adminInfo?: { adminId?: string; adminName?: string }) => {
     sessionStorage.setItem('lab_role', 'admin');
     sessionStorage.setItem('lab_session_unlocked', 'true');
+    if (adminInfo?.adminId && adminInfo?.adminName) {
+      sessionStorage.setItem('lab_admin_id', adminInfo.adminId);
+      sessionStorage.setItem('lab_admin_name', adminInfo.adminName);
+      setActiveAdminId(adminInfo.adminId);
+      setActiveAdminName(adminInfo.adminName);
+    } else {
+      sessionStorage.removeItem('lab_admin_id');
+      sessionStorage.removeItem('lab_admin_name');
+      setActiveAdminId('');
+      setActiveAdminName('');
+    }
     setRole('admin');
     setSessionUnlocked(true);
     setAdminModalOpen(false);
-    notify('success', 'เข้าสู่ระบบในสิทธิ์ผู้ดูแลระบบ (Admin) สำเร็จ');
+    notify(
+      'success',
+      adminInfo?.adminName
+        ? `เข้าสู่ระบบผู้ดูแลระบบ (${adminInfo.adminName}) สำเร็จ`
+        : 'เข้าสู่ระบบในสิทธิ์ผู้ดูแลระบบ (Admin) สำเร็จ'
+    );
   };
 
   const handleExitAdmin = () => {
     sessionStorage.setItem('lab_role', 'user');
+    sessionStorage.removeItem('lab_admin_id');
+    sessionStorage.removeItem('lab_admin_name');
+    setActiveAdminId('');
+    setActiveAdminName('');
     setRole('user');
     setEditingLog(null);
     setMobileMenuOpen(false);
@@ -776,7 +831,9 @@ export default function App() {
             <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
               {firebaseUser?.displayName ||
                 firebaseUser?.email ||
-                (role === 'admin' ? 'ผู้ดูแลระบบห้องคอมพิวเตอร์' : 'ผู้ใช้งานทั่วไป (User)')}
+                (role === 'admin'
+                  ? activeAdminName || 'ผู้ดูแลระบบห้องคอมพิวเตอร์'
+                  : 'ผู้ใช้งานทั่วไป (User)')}
             </div>
             <div className="text-[11px] flex items-center gap-1.5">
               <span>สิทธิ์:</span>
@@ -1062,6 +1119,8 @@ export default function App() {
                   settings={settings}
                   usageTypes={usageTypes}
                   pinHashes={pinHashes}
+                  activeAdminId={activeAdminId}
+                  activeAdminName={activeAdminName}
                   counts={{
                     logs: logs.length,
                     students: students.length,

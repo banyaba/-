@@ -1,5 +1,21 @@
 import React, { useState } from 'react';
-import { Save, RotateCcw, Palette, School, ListChecks, Trash2, Database, KeyRound } from 'lucide-react';
+import {
+  Save,
+  RotateCcw,
+  Palette,
+  School,
+  ListChecks,
+  Trash2,
+  Database,
+  KeyRound,
+  UserPlus,
+  ShieldCheck,
+  Pencil,
+  Eye,
+  EyeOff,
+  X,
+  Lock,
+} from 'lucide-react';
 import { DEFAULT_THEME_COLORS, type AppSettings, type ThemeColors } from '../types';
 import { api } from '../api/client';
 import { UsageTypesManagerPanel } from './UsageTypesManagerModal';
@@ -7,15 +23,24 @@ import { ConfirmModal } from './ConfirmModal';
 import {
   DEFAULT_ADMIN_PIN_6,
   DEFAULT_USER_PIN_6,
+  hashPin6,
   isValidPin6,
+  type ExtraAdminPin,
   type PinHashes,
 } from '../firebase/pinAuth';
-import { updateSecurityPins } from '../firebase/firestoreService';
+import {
+  addExtraAdminPin,
+  deleteExtraAdminPin,
+  updateExtraAdminPin,
+  updateSecurityPins,
+} from '../firebase/firestoreService';
 
 interface SettingsViewProps {
   settings: AppSettings;
   usageTypes: string[];
   pinHashes: PinHashes | null;
+  activeAdminId?: string;
+  activeAdminName?: string;
   counts: {
     logs: number;
     students: number;
@@ -70,6 +95,8 @@ export function SettingsView({
   settings,
   usageTypes,
   pinHashes,
+  activeAdminId = '',
+  activeAdminName = '',
   counts,
   onSettingsUpdated,
   onUsageTypesChanged,
@@ -86,13 +113,43 @@ export function SettingsView({
 
   const [newAdminPin, setNewAdminPin] = useState('');
   const [newUserPin, setNewUserPin] = useState('');
+  const [showAdminPin, setShowAdminPin] = useState(false);
+  const [showUserPin, setShowUserPin] = useState(false);
   const [savingPins, setSavingPins] = useState(false);
+
+  // Additional Admin PIN Accounts State (Primary Admin only)
+  const [adminFormModal, setAdminFormModal] = useState<{
+    mode: 'add' | 'edit';
+    target?: ExtraAdminPin;
+  } | null>(null);
+  const [extraName, setExtraName] = useState('');
+  const [extraPin, setExtraPin] = useState('');
+  const [showExtraPin, setShowExtraPin] = useState(false);
+  const [savingExtraAdmin, setSavingExtraAdmin] = useState(false);
+  const [deleteExtraTarget, setDeleteExtraTarget] = useState<ExtraAdminPin | null>(null);
+  const [deletingExtra, setDeletingExtra] = useState(false);
+
+  // Self PIN Change State (For Additional Admin viewing their own account only)
+  const [ownCurrentPin, setOwnCurrentPin] = useState('');
+  const [ownNewPin, setOwnNewPin] = useState('');
+  const [showOwnPin, setShowOwnPin] = useState(false);
+  const [savingOwnPin, setSavingOwnPin] = useState(false);
 
   const [clearModal, setClearModal] = useState<'logs' | 'all' | null>(null);
   const [clearing, setClearing] = useState(false);
 
+  const isPrimaryAdmin = !activeAdminId;
+  const extraAdmins = pinHashes?.extraAdmins || [];
+  const myExtraAdmin = activeAdminId
+    ? extraAdmins.find((a) => a.id === activeAdminId) || null
+    : null;
+
   const handleSavePins = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isPrimaryAdmin) {
+      onNotify('error', 'ผู้ดูแลระบบเพิ่มเติมไม่มีสิทธิ์แก้ไขรหัส PIN ของผู้อื่น');
+      return;
+    }
     const adminTrimmed = newAdminPin.trim();
     const userTrimmed = newUserPin.trim();
     if (!adminTrimmed && !userTrimmed) {
@@ -113,7 +170,8 @@ export function SettingsView({
       const updated = await updateSecurityPins(
         adminTrimmed || null,
         userTrimmed || null,
-        pinHashes
+        pinHashes,
+        activeAdminId
       );
       onPinHashesChanged(updated);
       setNewAdminPin('');
@@ -127,21 +185,138 @@ export function SettingsView({
   };
 
   const handleResetDefaultPins = async () => {
+    if (!isPrimaryAdmin) {
+      onNotify('error', 'ผู้ดูแลระบบเพิ่มเติมไม่มีสิทธิ์รีเซ็ตรหัส PIN หลัก');
+      return;
+    }
     setSavingPins(true);
     try {
       const updated = await updateSecurityPins(
         DEFAULT_ADMIN_PIN_6,
         DEFAULT_USER_PIN_6,
-        pinHashes
+        pinHashes,
+        activeAdminId
       );
       onPinHashesChanged(updated);
       setNewAdminPin('');
       setNewUserPin('');
-      onNotify('success', 'รีเซ็ตรหัส PIN เป็นค่าเริ่มต้นเรียบร้อยแล้ว');
+      onNotify('success', 'รีเซ็ตรหัส PIN หลักเป็นค่าเริ่มต้นเรียบร้อยแล้ว');
     } catch (err) {
       onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถรีเซ็ตรหัส PIN ได้');
     } finally {
       setSavingPins(false);
+    }
+  };
+
+  const openAddExtraAdminModal = () => {
+    if (!isPrimaryAdmin) return;
+    setExtraName('');
+    setExtraPin('');
+    setShowExtraPin(false);
+    setAdminFormModal({ mode: 'add' });
+  };
+
+  const openEditExtraAdminModal = (entry: ExtraAdminPin) => {
+    if (!isPrimaryAdmin) return;
+    setExtraName(entry.name);
+    setExtraPin('');
+    setShowExtraPin(false);
+    setAdminFormModal({ mode: 'edit', target: entry });
+  };
+
+  const handleSaveExtraAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminFormModal || !isPrimaryAdmin) return;
+    const cleanName = extraName.trim();
+    const cleanPin = extraPin.trim();
+
+    if (!cleanName) {
+      onNotify('error', 'กรุณากรอกชื่อผู้ดูแลระบบ');
+      return;
+    }
+    if (adminFormModal.mode === 'add' && !isValidPin6(cleanPin)) {
+      onNotify('error', 'กรุณากรอกรหัส PIN 6 หลักสำหรับผู้ดูแลระบบใหม่');
+      return;
+    }
+    if (adminFormModal.mode === 'edit' && cleanPin && !isValidPin6(cleanPin)) {
+      onNotify('error', 'รหัส PIN ใหม่ต้องเป็นตัวเลข 6 หลัก');
+      return;
+    }
+
+    setSavingExtraAdmin(true);
+    try {
+      const updated =
+        adminFormModal.mode === 'add'
+          ? await addExtraAdminPin(cleanName, cleanPin, pinHashes, activeAdminId)
+          : await updateExtraAdminPin(
+              adminFormModal.target!.id,
+              cleanName,
+              cleanPin || null,
+              pinHashes,
+              activeAdminId
+            );
+      onPinHashesChanged(updated);
+      setAdminFormModal(null);
+      setExtraName('');
+      setExtraPin('');
+      onNotify(
+        'success',
+        adminFormModal.mode === 'add'
+          ? `เพิ่มผู้ดูแลระบบ "${cleanName}" พร้อมรหัส PIN 6 หลักเรียบร้อยแล้ว`
+          : `อัปเดตข้อมูลผู้ดูแลระบบ "${cleanName}" เรียบร้อยแล้ว`
+      );
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถบันทึกข้อมูลผู้ดูแลระบบได้');
+    } finally {
+      setSavingExtraAdmin(false);
+    }
+  };
+
+  const handleConfirmDeleteExtraAdmin = async () => {
+    if (!deleteExtraTarget || !isPrimaryAdmin) return;
+    setDeletingExtra(true);
+    try {
+      const updated = await deleteExtraAdminPin(deleteExtraTarget.id, pinHashes, activeAdminId);
+      onPinHashesChanged(updated);
+      onNotify('success', `ลบผู้ดูแลระบบ "${deleteExtraTarget.name}" เรียบร้อยแล้ว`);
+      setDeleteExtraTarget(null);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถลบผู้ดูแลระบบได้');
+    } finally {
+      setDeletingExtra(false);
+    }
+  };
+
+  const handleChangeOwnExtraPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!myExtraAdmin) return;
+    if (!isValidPin6(ownCurrentPin) || !isValidPin6(ownNewPin)) {
+      onNotify('error', 'กรุณากรอกรหัส PIN ปัจจุบันและรหัส PIN ใหม่เป็นตัวเลข 6 หลัก');
+      return;
+    }
+
+    setSavingOwnPin(true);
+    try {
+      const currentHash = await hashPin6(ownCurrentPin);
+      if (currentHash !== myExtraAdmin.pinHash) {
+        onNotify('error', 'รหัส PIN ปัจจุบันไม่ถูกต้อง');
+        return;
+      }
+      const updated = await updateExtraAdminPin(
+        myExtraAdmin.id,
+        myExtraAdmin.name,
+        ownNewPin,
+        pinHashes,
+        activeAdminId
+      );
+      onPinHashesChanged(updated);
+      setOwnCurrentPin('');
+      setOwnNewPin('');
+      onNotify('success', 'เปลี่ยนรหัส PIN 6 หลักของบัญชีคุณเรียบร้อยแล้ว');
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถเปลี่ยนรหัส PIN ได้');
+    } finally {
+      setSavingOwnPin(false);
     }
   };
 
@@ -411,7 +586,7 @@ export function SettingsView({
       </div>
     </section>
 
-    {/* 6-Digit PIN Security Configuration Section */}
+    {/* 6-Digit PIN Security & Admin Accounts Configuration Section */}
     <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-100/80 dark:border-amber-900/50 bg-gradient-to-r from-amber-50/90 via-orange-50/60 to-transparent dark:from-amber-950/40 dark:via-orange-950/30 dark:to-transparent px-6 py-4">
         <div className="flex items-center gap-3">
@@ -420,72 +595,277 @@ export function SettingsView({
           </span>
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              ตั้งค่ารหัสผ่านเข้าสู่ระบบ 6 หลัก (PIN)
+              {isPrimaryAdmin
+                ? 'ตั้งค่ารหัสผ่านเข้าสู่ระบบ 6 หลัก (PIN) และผู้ดูแลระบบ'
+                : 'จัดการรหัสผ่านเข้าสู่ระบบ 6 หลัก (PIN) ของฉัน'}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              กำหนดรหัสตัวเลข 6 หลัก สำหรับเข้าสู่ระบบและปลดล็อกหน้าจอ
+              {isPrimaryAdmin
+                ? 'แก้ไขรหัส PIN หลัก และเพิ่มบัญชีผู้ดูแลระบบเพิ่มเติมพร้อมตั้งรหัสผ่านใหม่ได้ (สูงสุด 4 คน)'
+                : 'ผู้ดูแลระบบเพิ่มเติมไม่สามารถดูหรือแก้ไขรหัสผ่านของผู้ดูแลระบบหลักและบุคคลอื่นได้'}
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          disabled={savingPins}
-          onClick={() => void handleResetDefaultPins()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          <span>รีเซ็ตเป็นค่าเริ่มต้น</span>
-        </button>
+        {isPrimaryAdmin && (
+          <button
+            type="button"
+            disabled={savingPins}
+            onClick={() => void handleResetDefaultPins()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>รีเซ็ต PIN หลักเป็นค่าเริ่มต้น</span>
+          </button>
+        )}
       </div>
 
-      <form onSubmit={handleSavePins} className="p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="pin-admin-6" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              รหัส PIN ผู้ดูแลระบบ (Admin) — 6 หลัก
-            </label>
-            <input
-              id="pin-admin-6"
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={newAdminPin}
-              onChange={(e) => setNewAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="กรอกเลข 6 หลักใหม่ (เว้นว่างถ้าไม่เปลี่ยน)"
-              className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
-          </div>
+      {isPrimaryAdmin ? (
+        <div className="p-6 space-y-6">
+          {/* Part 1: Main Admin & User PIN Editor (Primary Admin Only) */}
+          <form onSubmit={handleSavePins} className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                แก้ไขรหัส PIN เข้าสู่ระบบหลัก
+              </h3>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                กรอกเฉพาะช่องที่ต้องการเปลี่ยน (ตัวเลข 6 หลัก)
+              </span>
+            </div>
 
-          <div>
-            <label htmlFor="pin-user-6" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              รหัส PIN ผู้ใช้งานทั่วไป (User) — 6 หลัก
-            </label>
-            <input
-              id="pin-user-6"
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={newUserPin}
-              onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="กรอกเลข 6 หลักใหม่ (เว้นว่างถ้าไม่เปลี่ยน)"
-              className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="pin-admin-6" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  รหัส PIN ผู้ดูแลระบบหลัก (Admin) — 6 หลัก
+                </label>
+                <div className="relative">
+                  <input
+                    id="pin-admin-6"
+                    type={showAdminPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={newAdminPin}
+                    onChange={(e) => setNewAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="กรอกเลข 6 หลักใหม่ (เว้นว่างถ้าไม่เปลี่ยน)"
+                    className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-3 pr-10 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPin((prev) => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label={showAdminPin ? 'ซ่อนรหัส PIN Admin' : 'แสดงรหัส PIN Admin'}
+                  >
+                    {showAdminPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="pin-user-6" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  รหัส PIN ผู้ใช้งานทั่วไป (User) — 6 หลัก
+                </label>
+                <div className="relative">
+                  <input
+                    id="pin-user-6"
+                    type={showUserPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={newUserPin}
+                    onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="กรอกเลข 6 หลักใหม่ (เว้นว่างถ้าไม่เปลี่ยน)"
+                    className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-3 pr-10 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUserPin((prev) => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label={showUserPin ? 'ซ่อนรหัส PIN User' : 'แสดงรหัส PIN User'}
+                  >
+                    {showUserPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={savingPins || (!newAdminPin && !newUserPin)}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-55"
+                style={{ backgroundColor: 'var(--theme-primary)' }}
+              >
+                <Save className="h-3.5 w-3.5" />
+                <span>{savingPins ? 'กำลังบันทึก...' : 'บันทึกรหัส PIN หลัก'}</span>
+              </button>
+            </div>
+          </form>
+
+          {/* Part 2: Additional Admin PIN Accounts (Primary Admin Only) */}
+          <div className="pt-5 border-t border-slate-200/80 dark:border-slate-800 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <span>ผู้ดูแลระบบเพิ่มเติม (รหัส PIN ประจำบุคคล)</span>
+                  <span className="font-mono-num text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                    {extraAdmins.length}/4
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  เพิ่มชื่อผู้ดูแลระบบพร้อมรหัส PIN 6 หลักใหม่ได้สูงสุด 4 คน เพื่อให้ผู้ช่วยหรือครูท่านอื่นเข้าใช้งานสิทธิ์ Admin ได้
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={extraAdmins.length >= 4}
+                onClick={openAddExtraAdminModal}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xs disabled:opacity-50 transition-colors"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>{extraAdmins.length >= 4 ? 'ครบสูงสุด 4 คนแล้ว' : 'เพิ่มผู้ดูแลระบบใหม่'}</span>
+              </button>
+            </div>
+
+            {extraAdmins.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700/80 bg-slate-50/60 dark:bg-slate-800/30 p-5 text-center">
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  ยังไม่มีผู้ดูแลระบบเพิ่มเติม
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  กดปุ่ม &ldquo;เพิ่มผู้ดูแลระบบใหม่&rdquo; เพื่อสร้างชื่อผู้ดูแลและตั้งรหัส PIN 6 หลักสำหรับเข้าสู่ระบบ
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {extraAdmins.map((admin) => (
+                  <div
+                    key={admin.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                        <ShieldCheck className="h-4.5 w-4.5" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+                          {admin.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                          <span className="font-mono-num tracking-wider">PIN: ••••••</span>
+                          <span aria-hidden="true">·</span>
+                          <span>อัปเดต {new Date(admin.updatedAt).toLocaleDateString('th-TH')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => openEditExtraAdminModal(admin)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                        title="แก้ไขชื่อหรือรหัส PIN"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        <span>แก้ไข</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteExtraTarget(admin)}
+                        className="inline-flex items-center justify-center rounded-lg border border-rose-200 dark:border-rose-900/70 bg-rose-50 dark:bg-rose-950/40 p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors"
+                        aria-label={`ลบผู้ดูแลระบบ ${admin.name}`}
+                        title="ลบผู้ดูแลระบบ"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+      ) : (
+        /* Restricted View for Additional Admin: Cannot view or edit other admins' PINs */
+        <div className="p-6 space-y-5">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200/80 dark:border-amber-800/70 bg-amber-50/70 dark:bg-amber-950/30 p-4">
+            <Lock className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-900 dark:text-amber-200 space-y-1">
+              <div className="font-semibold">
+                จำกัดสิทธิ์การเข้าถึงรหัสผ่าน: บัญชี &ldquo;{myExtraAdmin?.name || activeAdminName || 'ผู้ดูแลระบบเพิ่มเติม'}&rdquo;
+              </div>
+              <p className="text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                คุณอยู่ในสิทธิ์ <strong>ผู้ดูแลระบบเพิ่มเติม</strong> จึงไม่สามารถดูรายชื่อ แก้ไข หรือลบรหัสผ่าน PIN ของผู้ดูแลระบบหลัก ผู้ใช้งานทั่วไป หรือผู้ดูแลระบบท่านอื่นได้ (เปลี่ยนได้เฉพาะรหัส PIN 6 หลักของตนเองเท่านั้น)
+              </p>
+            </div>
+          </div>
 
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={savingPins || (!newAdminPin && !newUserPin)}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-55"
-            style={{ backgroundColor: 'var(--theme-primary)' }}
-          >
-            <Save className="h-3.5 w-3.5" />
-            <span>{savingPins ? 'กำลังบันทึก...' : 'บันทึกรหัส PIN 6 หลัก'}</span>
-          </button>
+          {myExtraAdmin ? (
+            <form onSubmit={handleChangeOwnExtraPin} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="own-current-pin" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    รหัส PIN ปัจจุบันของคุณ (6 หลัก) *
+                  </label>
+                  <input
+                    id="own-current-pin"
+                    type={showOwnPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    maxLength={6}
+                    required
+                    value={ownCurrentPin}
+                    onChange={(e) => setOwnCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="กรอกรหัส PIN เดิม 6 หลัก"
+                    className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="own-new-pin" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    รหัส PIN ใหม่ของคุณ (6 หลัก) *
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="own-new-pin"
+                      type={showOwnPin ? 'text' : 'password'}
+                      inputMode="numeric"
+                      maxLength={6}
+                      required
+                      value={ownNewPin}
+                      onChange={(e) => setOwnNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="กรอกรหัส PIN ใหม่ 6 หลัก"
+                      className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-3 pr-10 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOwnPin((prev) => !prev)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      aria-label={showOwnPin ? 'ซ่อนรหัส PIN' : 'แสดงรหัส PIN'}
+                    >
+                      {showOwnPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingOwnPin || ownCurrentPin.length !== 6 || ownNewPin.length !== 6}
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-55"
+                  style={{ backgroundColor: 'var(--theme-primary)' }}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{savingOwnPin ? 'กำลังบันทึก...' : 'เปลี่ยนรหัส PIN ของฉัน'}</span>
+                </button>
+              </div>
+            </form>
+          ) : (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              ไม่พบข้อมูลบัญชีผู้ดูแลระบบเพิ่มเติมนี้ในระบบ (อาจถูกลบโดยผู้ดูแลระบบหลักแล้ว)
+            </p>
+          )}
         </div>
-      </form>
+      )}
     </section>
 
     {/* Data Management / Clear Data Section */}
@@ -560,6 +940,119 @@ export function SettingsView({
       </div>
       </div>
     </section>
+
+    {/* Add / Edit Additional Admin Modal (Primary Admin Only) */}
+    {isPrimaryAdmin && adminFormModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="extra-admin-modal-title"
+      >
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-indigo-50/90 to-amber-50/50 dark:from-indigo-950/40 dark:to-amber-950/20 px-6 py-4">
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <div>
+                <h3 id="extra-admin-modal-title" className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {adminFormModal.mode === 'add'
+                    ? 'เพิ่มผู้ดูแลระบบและรหัสผ่านใหม่'
+                    : 'แก้ไขผู้ดูแลระบบ / รหัส PIN'}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  ใช้ตัวเลข 6 หลักสำหรับเข้าสู่ระบบในสิทธิ์ผู้ดูแลระบบ (Admin)
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminFormModal(null)}
+              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              aria-label="ปิดหน้าต่าง"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveExtraAdmin} className="p-6 space-y-4">
+            <div>
+              <label htmlFor="extra-admin-name" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                ชื่อผู้ดูแลระบบ *
+              </label>
+              <input
+                id="extra-admin-name"
+                type="text"
+                required
+                value={extraName}
+                onChange={(e) => setExtraName(e.target.value)}
+                placeholder="เช่น ครูสมชาย ใจดี หรือ ผู้ช่วยห้องคอม"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="extra-admin-pin" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                {adminFormModal.mode === 'add'
+                  ? 'รหัสผ่าน PIN 6 หลักใหม่ *'
+                  : 'รหัสผ่าน PIN 6 หลักใหม่ (เว้นว่างหากไม่เปลี่ยนรหัส)'}
+              </label>
+              <div className="relative">
+                <input
+                  id="extra-admin-pin"
+                  type={showExtraPin ? 'text' : 'password'}
+                  inputMode="numeric"
+                  maxLength={6}
+                  required={adminFormModal.mode === 'add'}
+                  value={extraPin}
+                  onChange={(e) => setExtraPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="กรอกตัวเลข 6 หลัก"
+                  className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-3 pr-10 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowExtraPin((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  aria-label={showExtraPin ? 'ซ่อนรหัส PIN' : 'แสดงรหัส PIN'}
+                >
+                  {showExtraPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setAdminFormModal(null)}
+                className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                disabled={savingExtraAdmin}
+                className="rounded-lg bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {savingExtraAdmin
+                  ? 'กำลังบันทึก...'
+                  : adminFormModal.mode === 'add'
+                  ? 'เพิ่มผู้ดูแลระบบ'
+                  : 'บันทึกการแก้ไข'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    <ConfirmModal
+      open={isPrimaryAdmin && Boolean(deleteExtraTarget)}
+      title="ยืนยันการลบผู้ดูแลระบบ"
+      description={`ต้องการลบผู้ดูแลระบบ "${deleteExtraTarget?.name || ''}" และยกเลิกรหัส PIN 6 หลักของบัญชีนี้หรือไม่?`}
+      confirmLabel="ยืนยันลบผู้ดูแลระบบ"
+      loading={deletingExtra}
+      onConfirm={handleConfirmDeleteExtraAdmin}
+      onCancel={() => setDeleteExtraTarget(null)}
+    />
 
     <ConfirmModal
       open={clearModal !== null}
