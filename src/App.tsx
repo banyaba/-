@@ -60,16 +60,72 @@ interface NavItem {
   label: string;
   icon: typeof LayoutDashboard;
   adminOnly?: boolean;
+  iconClass: string;
+  activeGradient: string;
+  headerTint: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'หน้าหลัก', icon: LayoutDashboard },
-  { id: 'add-data', label: 'เพิ่มข้อมูล', icon: PlusCircle },
-  { id: 'data-table', label: 'ตารางข้อมูล', icon: Table2 },
-  { id: 'students', label: 'นักเรียน', icon: GraduationCap, adminOnly: true },
-  { id: 'subjects', label: 'รายวิชา', icon: BookOpen, adminOnly: true },
-  { id: 'reports', label: 'รายงาน', icon: FileBarChart2, adminOnly: true },
-  { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings, adminOnly: true },
+  {
+    id: 'add-data',
+    label: 'บันทึกใช้งาน',
+    icon: PlusCircle,
+    iconClass: 'bg-blue-50 text-blue-600 dark:bg-blue-950/70 dark:text-blue-400',
+    activeGradient: 'linear-gradient(135deg, #2563eb, #4f46e5)',
+    headerTint: 'from-blue-600 to-indigo-600',
+  },
+  {
+    id: 'dashboard',
+    label: 'หน้าหลัก',
+    icon: LayoutDashboard,
+    iconClass: 'bg-violet-50 text-violet-600 dark:bg-violet-950/70 dark:text-violet-400',
+    activeGradient: 'linear-gradient(135deg, #6366f1, #7c3aed)',
+    headerTint: 'from-indigo-600 to-violet-600',
+  },
+  {
+    id: 'data-table',
+    label: 'ตารางข้อมูล',
+    icon: Table2,
+    iconClass: 'bg-teal-50 text-teal-600 dark:bg-teal-950/70 dark:text-teal-400',
+    activeGradient: 'linear-gradient(135deg, #0d9488, #059669)',
+    headerTint: 'from-teal-600 to-emerald-600',
+  },
+  {
+    id: 'students',
+    label: 'นักเรียน',
+    icon: GraduationCap,
+    adminOnly: true,
+    iconClass: 'bg-sky-50 text-sky-600 dark:bg-sky-950/70 dark:text-sky-400',
+    activeGradient: 'linear-gradient(135deg, #0284c7, #0891b2)',
+    headerTint: 'from-sky-600 to-cyan-600',
+  },
+  {
+    id: 'subjects',
+    label: 'รายวิชา',
+    icon: BookOpen,
+    adminOnly: true,
+    iconClass: 'bg-amber-50 text-amber-600 dark:bg-amber-950/70 dark:text-amber-400',
+    activeGradient: 'linear-gradient(135deg, #f59e0b, #ea580c)',
+    headerTint: 'from-amber-500 to-orange-600',
+  },
+  {
+    id: 'reports',
+    label: 'รายงาน',
+    icon: FileBarChart2,
+    adminOnly: true,
+    iconClass: 'bg-rose-50 text-rose-600 dark:bg-rose-950/70 dark:text-rose-400',
+    activeGradient: 'linear-gradient(135deg, #e11d48, #db2777)',
+    headerTint: 'from-rose-600 to-pink-600',
+  },
+  {
+    id: 'settings',
+    label: 'ตั้งค่าระบบ',
+    icon: Settings,
+    adminOnly: true,
+    iconClass: 'bg-purple-50 text-purple-600 dark:bg-purple-950/70 dark:text-purple-400',
+    activeGradient: 'linear-gradient(135deg, #9333ea, #c026d3)',
+    headerTint: 'from-purple-600 to-fuchsia-600',
+  },
 ];
 
 function formatErrorForDisplay(raw: string): string {
@@ -113,7 +169,7 @@ export default function App() {
     return localStorage.getItem('lab_dark_mode') === 'true';
   });
 
-  const [activePage, setActivePage] = useState<PageId>('dashboard');
+  const [activePage, setActivePage] = useState<PageId>('add-data');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -441,12 +497,12 @@ export default function App() {
   // Login / Lock Screen (6-digit PIN + Passwordless User entry + Optional Google Sign-In)
   if (!sessionUnlocked) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-7 shadow-lg space-y-5">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50/70 to-emerald-50/60 dark:from-slate-950 dark:via-indigo-950/30 dark:to-slate-950 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-7 shadow-xl shadow-blue-900/5 dark:shadow-none space-y-5">
           <div className="flex items-center gap-3.5">
             <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white"
-              style={{ backgroundColor: 'var(--theme-primary)' }}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
+              style={{ background: 'linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))' }}
             >
               <Monitor className="h-6 w-6" />
             </div>
@@ -586,8 +642,10 @@ export default function App() {
     );
   }
 
+  const ActiveNavIcon = currentNav.icon;
+
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-[var(--theme-text)] transition-colors">
+    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-blue-50/25 to-violet-50/25 dark:from-slate-950 dark:via-slate-950 dark:to-indigo-950/15 text-[var(--theme-text)] transition-colors">
       {/* Mobile Sidebar Backdrop */}
       {mobileMenuOpen && (
         <div
@@ -598,17 +656,17 @@ export default function App() {
 
       {/* Sidebar Navigation */}
       <aside
-        className={`no-print fixed inset-y-0 left-0 z-50 w-64 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] flex flex-col justify-between transition-transform duration-200 lg:static lg:translate-x-0 ${
+        className={`no-print fixed inset-y-0 left-0 z-50 w-64 shrink-0 border-r border-slate-200/80 dark:border-slate-800 bg-[var(--theme-surface)] flex flex-col justify-between transition-transform duration-200 lg:static lg:translate-x-0 ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div>
           {/* Brand Header */}
-          <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200/80 dark:border-slate-800 bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-transparent dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-transparent">
             <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white"
-                style={{ backgroundColor: 'var(--theme-primary)' }}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-xs"
+                style={{ background: 'linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))' }}
               >
                 <Monitor className="h-5 w-5" />
               </div>
@@ -633,7 +691,7 @@ export default function App() {
           </div>
 
           {/* Nav Links */}
-          <nav aria-label="เมนูหลัก" className="p-3 space-y-1">
+          <nav aria-label="เมนูหลัก" className="p-3 space-y-1.5">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = activePage === item.id;
@@ -642,15 +700,21 @@ export default function App() {
                   key={item.id}
                   type="button"
                   onClick={() => handleNavigate(item.id)}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
+                  className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
                     isActive
-                      ? 'text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white'
+                      ? 'text-white shadow-sm'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white'
                   }`}
-                  style={isActive ? { backgroundColor: 'var(--theme-primary)' } : undefined}
+                  style={isActive ? { background: item.activeGradient } : undefined}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{item.label}</span>
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      isActive ? 'bg-white/20 text-white' : item.iconClass
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="truncate">{item.label}</span>
                 </button>
               );
             })}
@@ -658,15 +722,24 @@ export default function App() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+        <div className="p-4 border-t border-slate-200/80 dark:border-slate-800 space-y-2.5 bg-slate-50/60 dark:bg-slate-900/50">
           <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
-            <div className="font-medium text-slate-700 dark:text-slate-200 truncate">
+            <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
               {firebaseUser?.displayName ||
                 firebaseUser?.email ||
                 (role === 'admin' ? 'ผู้ดูแลระบบห้องคอมพิวเตอร์' : 'ผู้ใช้งานทั่วไป (User)')}
             </div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              สิทธิ์: {role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ผู้ใช้งานทั่วไป (User)'}
+            <div className="text-[11px] flex items-center gap-1.5">
+              <span>สิทธิ์:</span>
+              <span
+                className={
+                  role === 'admin'
+                    ? 'font-semibold text-indigo-600 dark:text-indigo-400'
+                    : 'font-semibold text-emerald-600 dark:text-emerald-400'
+                }
+              >
+                {role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ผู้ใช้งานทั่วไป (User)'}
+              </span>
             </div>
             <div>ปีการศึกษา {settings.academicYear}</div>
           </div>
@@ -687,9 +760,9 @@ export default function App() {
                 setMobileMenuOpen(false);
                 setAdminModalOpen(true);
               }}
-              className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-indigo-200 dark:border-indigo-900/70 bg-indigo-50/70 dark:bg-indigo-950/40 px-3 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 transition-colors"
             >
-              <ShieldCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <ShieldCheck className="h-3.5 w-3.5" />
               <span>เข้าสู่ระบบ Admin</span>
             </button>
           )}
@@ -699,7 +772,7 @@ export default function App() {
             onClick={handleLockScreen}
             className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
           >
-            <Lock className="h-3.5 w-3.5" />
+            <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
             <span>ล็อกหน้าจอ (รหัส 6 หลัก)</span>
           </button>
 
@@ -707,7 +780,7 @@ export default function App() {
             <button
               type="button"
               onClick={handleGoogleSignOut}
-              className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-rose-200 dark:border-rose-900/70 bg-rose-50/60 dark:bg-rose-950/30 px-3 py-2 text-xs font-medium text-rose-700 dark:text-rose-300 hover:bg-rose-100/80 dark:hover:bg-rose-900/50 transition-colors"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>ออกจากระบบ Google</span>
@@ -719,7 +792,7 @@ export default function App() {
       {/* Main Content Shell */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] px-4 sm:px-6 py-3.5">
+        <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 bg-[var(--theme-surface)]/95 backdrop-blur-xs px-4 sm:px-6 py-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
@@ -729,6 +802,12 @@ export default function App() {
             >
               <Menu className="h-4 w-4" />
             </button>
+
+            <div
+              className={`hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${currentNav.headerTint} text-white shadow-xs`}
+            >
+              <ActiveNavIcon className="h-4.5 w-4.5" />
+            </div>
 
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -749,9 +828,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setAdminModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/50 px-3 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors whitespace-nowrap shrink-0"
               >
-                <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <ShieldCheck className="h-4 w-4" />
                 <span className="hidden sm:inline">เข้าสู่ระบบ Admin</span>
               </button>
             )}
@@ -766,7 +845,7 @@ export default function App() {
               {darkMode ? (
                 <Sun className="h-4 w-4 text-amber-400" />
               ) : (
-                <Moon className="h-4 w-4 text-slate-600" />
+                <Moon className="h-4 w-4 text-indigo-600" />
               )}
               <span className="hidden sm:inline">{darkMode ? 'โหมดสว่าง' : 'โหมดมืด'}</span>
             </button>
@@ -774,11 +853,11 @@ export default function App() {
             <button
               type="button"
               onClick={() => handleNavigate('add-data')}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-95 whitespace-nowrap shrink-0"
-              style={{ backgroundColor: 'var(--theme-primary)' }}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition-opacity hover:opacity-95 whitespace-nowrap shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))' }}
             >
               <PlusCircle className="h-4 w-4" />
-              <span>บันทึกการใช้</span>
+              <span>บันทึกใช้งาน</span>
             </button>
           </div>
         </header>

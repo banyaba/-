@@ -141,38 +141,82 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
   return (
     <div className="space-y-6">
       {/* Control Panel (hidden on print) */}
-      <div className="no-print rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5">
-        {/* 4 Report Type Buttons */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {[
-            { id: 'daily' as const, label: '1. รายวัน', icon: Calendar },
-            { id: 'monthly' as const, label: '2. รายเดือน', icon: CalendarRange },
-            { id: 'semester' as const, label: '3. รายภาค', icon: BookOpenCheck },
-            { id: 'yearly' as const, label: '4. รายปี', icon: BarChart3 },
-          ].map((item) => {
-            const Icon = item.icon;
-            const active = draft.type === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setDraft((prev) => ({ ...prev, type: item.id }))}
-                className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
-                  active
-                    ? 'border-transparent text-white shadow-xs'
-                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
-                }`}
-                style={active ? { backgroundColor: 'var(--theme-primary)' } : undefined}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+      <div className="no-print rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+        <div className="flex items-center gap-3 border-b border-rose-100/80 dark:border-rose-900/50 bg-gradient-to-r from-rose-50/90 via-pink-50/60 to-transparent dark:from-rose-950/40 dark:via-pink-950/30 dark:to-transparent px-6 py-4">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-rose-600 to-pink-600 text-white shadow-xs shrink-0">
+            <BarChart3 className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              กำหนดเงื่อนไขและออกรายงานการใช้ห้องคอมพิวเตอร์
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              เลือกรูปแบบช่วงเวลา สร้างตัวอย่าง พิมพ์ A4 หรือส่งออกไฟล์ CSV
+            </p>
+          </div>
         </div>
 
-        {/* Dynamic Criteria Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+        <div className="p-6 space-y-5">
+          {/* 4 Report Type Buttons */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {[
+              {
+                id: 'daily' as const,
+                label: '1. รายวัน',
+                icon: Calendar,
+                activeGrad: 'from-sky-600 to-cyan-600',
+                iconBg: 'bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400',
+              },
+              {
+                id: 'monthly' as const,
+                label: '2. รายเดือน',
+                icon: CalendarRange,
+                activeGrad: 'from-indigo-600 to-violet-600',
+                iconBg: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400',
+              },
+              {
+                id: 'semester' as const,
+                label: '3. รายภาค',
+                icon: BookOpenCheck,
+                activeGrad: 'from-amber-500 to-orange-600',
+                iconBg: 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+              },
+              {
+                id: 'yearly' as const,
+                label: '4. รายปี',
+                icon: BarChart3,
+                activeGrad: 'from-rose-600 to-pink-600',
+                iconBg: 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              const active = draft.type === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setDraft((prev) => ({ ...prev, type: item.id }))}
+                  className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-all whitespace-nowrap ${
+                    active
+                      ? `border-transparent bg-gradient-to-r ${item.activeGrad} text-white shadow-sm`
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/80'
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-md shrink-0 ${
+                      active ? 'bg-white/20 text-white' : item.iconBg
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Dynamic Criteria Inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
           {draft.type === 'daily' && (
             <div>
               <label htmlFor="rep-date" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -326,7 +370,7 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 dark:border-indigo-800/70 bg-indigo-50/70 dark:bg-indigo-950/40 px-4 py-2.5 text-sm font-medium text-indigo-700 dark:text-indigo-200 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
           >
             <Printer className="h-4 w-4" />
             <span>พิมพ์ A4</span>
@@ -335,12 +379,13 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
           <button
             type="button"
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-95 whitespace-nowrap"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-95 whitespace-nowrap"
             style={{ backgroundColor: 'var(--theme-accent)' }}
           >
             <Download className="h-4 w-4" />
             <span>Export CSV</span>
           </button>
+        </div>
         </div>
       </div>
 
@@ -349,7 +394,7 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
         {/* Document Header */}
         <header className="border-b-2 border-slate-800 pb-4 text-center">
           <h2 className="text-lg font-bold text-slate-900">{settings.schoolName}</h2>
-          <p className="mt-1 text-base font-semibold text-slate-800">{reportTitle}</p>
+          <p className="mt-1 text-base font-semibold text-indigo-900">{reportTitle}</p>
           <p className="mt-1 text-xs text-slate-500">
             ปีการศึกษา {settings.academicYear} · ผู้รับผิดชอบห้องคอมพิวเตอร์: {settings.labManager}
           </p>
@@ -357,27 +402,27 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
 
         {/* 4 Summary Stat Cards */}
         <section className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-center">
-            <div className="text-xs font-medium text-slate-500">ครั้งการใช้</div>
-            <div className="mt-1 font-mono-num text-2xl font-bold text-slate-900">
+          <div className="rounded-lg border border-blue-200/80 bg-blue-50/70 p-3.5 text-center">
+            <div className="text-xs font-medium text-blue-700">ครั้งการใช้</div>
+            <div className="mt-1 font-mono-num text-2xl font-bold text-blue-950">
               {reportStats.totalUsages.toLocaleString('th-TH')}
             </div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-center">
-            <div className="text-xs font-medium text-slate-500">นักเรียน</div>
-            <div className="mt-1 font-mono-num text-2xl font-bold text-slate-900">
+          <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3.5 text-center">
+            <div className="text-xs font-medium text-emerald-700">นักเรียน</div>
+            <div className="mt-1 font-mono-num text-2xl font-bold text-emerald-950">
               {reportStats.uniqueStudents.toLocaleString('th-TH')}
             </div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-center">
-            <div className="text-xs font-medium text-slate-500">ชั้นเรียน</div>
-            <div className="mt-1 font-mono-num text-2xl font-bold text-slate-900">
+          <div className="rounded-lg border border-amber-200/80 bg-amber-50/70 p-3.5 text-center">
+            <div className="text-xs font-medium text-amber-700">ชั้นเรียน</div>
+            <div className="mt-1 font-mono-num text-2xl font-bold text-amber-950">
               {reportStats.uniqueClasses.toLocaleString('th-TH')}
             </div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-center">
-            <div className="text-xs font-medium text-slate-500">วิชา</div>
-            <div className="mt-1 font-mono-num text-2xl font-bold text-slate-900">
+          <div className="rounded-lg border border-violet-200/80 bg-violet-50/70 p-3.5 text-center">
+            <div className="text-xs font-medium text-violet-700">วิชา</div>
+            <div className="mt-1 font-mono-num text-2xl font-bold text-violet-950">
               {reportStats.uniqueSubjects.toLocaleString('th-TH')}
             </div>
           </div>

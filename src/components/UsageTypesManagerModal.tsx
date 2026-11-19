@@ -311,7 +311,7 @@ export function UsageTypesManagerModal({
       aria-labelledby="usage-types-modal-title"
     >
       <div className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-100/80 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-transparent dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-transparent">
           <div>
             <h3
               id="usage-types-modal-title"

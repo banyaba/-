@@ -106,12 +106,14 @@ export function DashboardView({
     <div className="space-y-6">
       {/* 4 Quick Stat Cards */}
       <section aria-label="สถิติด่วน" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        <div className="rounded-xl border border-blue-200/70 dark:border-blue-900/60 bg-gradient-to-br from-blue-50/80 via-[var(--theme-surface)] to-[var(--theme-surface)] dark:from-blue-950/30 dark:via-slate-900 dark:to-slate-900 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
               ครั้งการใช้ทั้งหมด
             </span>
-            <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-xs">
+              <Activity className="h-4 w-4" />
+            </span>
           </div>
           <div className="mt-3 font-mono-num text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             {logs.length.toLocaleString('th-TH')}
@@ -121,42 +123,48 @@ export function DashboardView({
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        <div className="rounded-xl border border-emerald-200/70 dark:border-emerald-900/60 bg-gradient-to-br from-emerald-50/80 via-[var(--theme-surface)] to-[var(--theme-surface)] dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
               จำนวนนักเรียนที่เข้าใช้
             </span>
-            <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xs">
+              <Users className="h-4 w-4" />
+            </span>
           </div>
           <div className="mt-3 font-mono-num text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             {uniqueStudentsCount.toLocaleString('th-TH')}
           </div>
           <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-            จากรายชื่อในระบบทั้งหมด <span className="font-mono-num">{students.length}</span> คน
+            จากรายชื่อในระบบทั้งหมด <span className="font-mono-num font-semibold text-emerald-700 dark:text-emerald-300">{students.length}</span> คน
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        <div className="rounded-xl border border-amber-200/70 dark:border-amber-900/60 bg-gradient-to-br from-amber-50/80 via-[var(--theme-surface)] to-[var(--theme-surface)] dark:from-amber-950/30 dark:via-slate-900 dark:to-slate-900 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
               ชั้นเรียนทั้งหมด
             </span>
-            <School className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-xs">
+              <School className="h-4 w-4" />
+            </span>
           </div>
           <div className="mt-3 font-mono-num text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             {CLASS_LIST.length}
           </div>
           <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-            เข้าใช้งานแล้ว <span className="font-mono-num">{activeClassesCount}</span> ชั้นเรียน (ป.1 - ป.6)
+            เข้าใช้งานแล้ว <span className="font-mono-num font-semibold text-amber-700 dark:text-amber-300">{activeClassesCount}</span> ชั้นเรียน (ป.1 - ป.6)
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        <div className="rounded-xl border border-violet-200/70 dark:border-violet-900/60 bg-gradient-to-br from-violet-50/80 via-[var(--theme-surface)] to-[var(--theme-surface)] dark:from-violet-950/30 dark:via-slate-900 dark:to-slate-900 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-violet-700 dark:text-violet-300">
               วิชาทั้งหมด
             </span>
-            <BookOpen className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-xs">
+              <BookOpen className="h-4 w-4" />
+            </span>
           </div>
           <div className="mt-3 font-mono-num text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             {subjects.length.toLocaleString('th-TH')}
@@ -168,10 +176,10 @@ export function DashboardView({
       </section>
 
       {/* Quick Actions */}
-      <section aria-label="ปุ่มลัด" className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-5">
+      <section aria-label="ปุ่มลัด" className="rounded-xl border border-indigo-200/70 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/60 via-[var(--theme-surface)] to-teal-50/60 dark:from-indigo-950/25 dark:via-slate-900 dark:to-teal-950/20 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
               ทางลัดการทำงาน (Quick Actions)
             </h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -182,19 +190,19 @@ export function DashboardView({
             <button
               type="button"
               onClick={() => onNavigate('add-data')}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-95 whitespace-nowrap shrink-0"
-              style={{ backgroundColor: 'var(--theme-primary)' }}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-opacity hover:opacity-95 whitespace-nowrap shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))' }}
             >
               <PlusCircle className="h-4 w-4" />
-              <span>เพิ่มข้อมูล</span>
+              <span>บันทึกใช้งาน</span>
             </button>
 
             <button
               type="button"
               onClick={() => onNavigate('data-table')}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-2 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50/70 dark:bg-teal-950/40 px-4 py-2.5 text-sm font-semibold text-teal-800 dark:text-teal-200 hover:bg-teal-100/80 dark:hover:bg-teal-900/50 transition-colors whitespace-nowrap shrink-0"
             >
-              <Table2 className="h-4 w-4" />
+              <Table2 className="h-4 w-4 text-teal-600 dark:text-teal-400" />
               <span>ตารางข้อมูล</span>
             </button>
 
@@ -202,8 +210,8 @@ export function DashboardView({
               <button
                 type="button"
                 onClick={() => onNavigate('reports')}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-95 whitespace-nowrap shrink-0"
-                style={{ backgroundColor: 'var(--theme-secondary)' }}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-opacity hover:opacity-95 whitespace-nowrap shrink-0"
+                style={{ background: 'linear-gradient(135deg, #e11d48, #db2777)' }}
               >
                 <FileBarChart2 className="h-4 w-4" />
                 <span>รายงาน</span>
@@ -217,7 +225,7 @@ export function DashboardView({
       <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
               สถิติการใช้ห้องคอมพิวเตอร์รายเดือน (12 เดือน)
             </h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -356,14 +364,14 @@ export function DashboardView({
 
       {/* Recent Logs Preview */}
       <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-indigo-50/50 via-transparent to-blue-50/40 dark:from-indigo-950/25 dark:via-transparent dark:to-blue-950/20">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
             รายการเข้าใช้ล่าสุด
           </h2>
           <button
             type="button"
             onClick={() => onNavigate('data-table')}
-            className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold hover:underline whitespace-nowrap"
             style={{ color: 'var(--theme-primary)' }}
           >
             <span>ดูทั้งหมด</span>
@@ -378,7 +386,7 @@ export function DashboardView({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <thead className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-indigo-50/40 dark:from-slate-800/80 dark:via-slate-800/60 dark:to-slate-800/80 text-xs font-semibold text-slate-600 dark:text-slate-300">
                 <tr>
                   <th className="px-6 py-3 whitespace-nowrap">วันที่ (พ.ศ.)</th>
                   <th className="px-4 py-3 whitespace-nowrap">เข้าใช้</th>

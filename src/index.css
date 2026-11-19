@@ -8,14 +8,14 @@
     --theme-text: #0f172a;
     --theme-accent: #10b981;
     --theme-secondary: #7c3aed;
-    --theme-bg: #f8fafc;
+    --theme-bg: #f1f5f9;
     --theme-border: #e2e8f0;
   }
 
   .dark {
-    --theme-surface: #111827;
+    --theme-surface: #0f172a;
     --theme-text: #f1f5f9;
-    --theme-bg: #0b1120;
+    --theme-bg: #090e1a;
     --theme-border: #1e293b;
   }
 

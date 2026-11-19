@@ -250,14 +250,14 @@ export function StudentsView({
   return (
     <div className="space-y-6">
       {/* Sub-navigation Tabs */}
-      <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 p-1">
+      <div className="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-sky-200/80 dark:border-sky-900/60 bg-gradient-to-r from-sky-50/90 to-cyan-50/90 dark:from-slate-900 dark:to-sky-950/40 p-1.5">
         <button
           type="button"
           onClick={() => setActiveTab('add')}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
             activeTab === 'add'
-              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'bg-gradient-to-r from-sky-600 to-cyan-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/70 hover:text-sky-700 dark:hover:text-sky-300'
           }`}
         >
           <UserPlus className="h-4 w-4" />
@@ -267,10 +267,10 @@ export function StudentsView({
         <button
           type="button"
           onClick={() => setActiveTab('bulk')}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
             activeTab === 'bulk'
-              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'bg-gradient-to-r from-sky-600 to-cyan-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/70 hover:text-sky-700 dark:hover:text-sky-300'
           }`}
         >
           <FileSpreadsheet className="h-4 w-4" />
@@ -283,10 +283,10 @@ export function StudentsView({
             setActiveTab('manage');
             setManageSelectedIds([]);
           }}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
             activeTab === 'manage'
-              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'bg-gradient-to-r from-sky-600 to-cyan-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/70 hover:text-sky-700 dark:hover:text-sky-300'
           }`}
         >
           <School className="h-4 w-4" />
@@ -298,12 +298,17 @@ export function StudentsView({
       {activeTab === 'add' && (
         <form
           onSubmit={handleSaveOne}
-          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5"
+          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              {editingStudent ? `แก้ไขข้อมูล: ${editingStudent.name}` : 'เพิ่มนักเรียนรายบุคคล'}
-            </h2>
+          <div className="flex items-center justify-between gap-3 border-b border-sky-100/80 dark:border-sky-900/50 bg-gradient-to-r from-sky-50/90 via-cyan-50/70 to-transparent dark:from-sky-950/40 dark:via-cyan-950/30 dark:to-transparent px-6 py-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-cyan-600 text-white shadow-xs shrink-0">
+                <UserPlus className="h-4 w-4" />
+              </span>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {editingStudent ? `แก้ไขข้อมูล: ${editingStudent.name}` : 'เพิ่มนักเรียนรายบุคคล'}
+              </h2>
+            </div>
             {editingStudent && (
               <button
                 type="button"
@@ -312,12 +317,13 @@ export function StudentsView({
                   setNumberInput('');
                   setNameInput('');
                 }}
-                className="text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                className="text-xs font-medium text-sky-700 hover:text-sky-900 dark:text-sky-400 dark:hover:text-sky-200"
               >
                 ยกเลิกการแก้ไข
               </button>
             )}
           </div>
+          <div className="p-6 space-y-5">
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -383,35 +389,41 @@ export function StudentsView({
               <span>{savingOne ? 'กำลังบันทึก...' : editingStudent ? 'อัปเดต' : 'บันทึก'}</span>
             </button>
           </div>
+          </div>
         </form>
       )}
 
       {/* Tab 2: Bulk Import from Excel */}
       {activeTab === 'bulk' && (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-emerald-100/80 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-transparent dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-transparent px-6 py-4">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-xs shrink-0">
+              <FileSpreadsheet className="h-4 w-4" />
+            </span>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               นำเข้าข้อมูลนักเรียนหลายคนจาก Excel
             </h2>
-            <ol className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-slate-600 dark:text-slate-400">
-              <li className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-3">
-                <span className="font-semibold text-slate-900 dark:text-slate-100">1. เตรียมคอลัมน์</span>
+          </div>
+
+          <div className="p-6 space-y-5">
+            <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-slate-600 dark:text-slate-400">
+              <li className="rounded-lg border border-sky-200/80 dark:border-sky-800/60 bg-gradient-to-br from-sky-50/80 to-cyan-50/50 dark:from-sky-950/40 dark:to-cyan-950/20 p-3">
+                <span className="font-semibold text-sky-800 dark:text-sky-300">1. เตรียมคอลัมน์</span>
                 <p className="mt-1">เรียง 3 คอลัมน์: เลขที่ | ชื่อ-สกุล | ชั้นเรียน</p>
               </li>
-              <li className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-3">
-                <span className="font-semibold text-slate-900 dark:text-slate-100">2. คัดลอกและวาง</span>
+              <li className="rounded-lg border border-indigo-200/80 dark:border-indigo-800/60 bg-gradient-to-br from-indigo-50/80 to-blue-50/50 dark:from-indigo-950/40 dark:to-blue-950/20 p-3">
+                <span className="font-semibold text-indigo-800 dark:text-indigo-300">2. คัดลอกและวาง</span>
                 <p className="mt-1">คัดลอกจาก Excel แล้ววางลงในกล่องข้อความด้านล่าง</p>
               </li>
-              <li className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-3">
-                <span className="font-semibold text-slate-900 dark:text-slate-100">3. ดูตัวอย่าง</span>
+              <li className="rounded-lg border border-violet-200/80 dark:border-violet-800/60 bg-gradient-to-br from-violet-50/80 to-purple-50/50 dark:from-violet-950/40 dark:to-purple-950/20 p-3">
+                <span className="font-semibold text-violet-800 dark:text-violet-300">3. ดูตัวอย่าง</span>
                 <p className="mt-1">กดปุ่ม &ldquo;ดูตัวอย่าง&rdquo; เพื่อตรวจสอบชื่อและชั้นเรียนอัตโนมัติ</p>
               </li>
-              <li className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-3">
-                <span className="font-semibold text-slate-900 dark:text-slate-100">4. นำเข้าข้อมูล</span>
+              <li className="rounded-lg border border-emerald-200/80 dark:border-emerald-800/60 bg-gradient-to-br from-emerald-50/80 to-teal-50/50 dark:from-emerald-950/40 dark:to-teal-950/20 p-3">
+                <span className="font-semibold text-emerald-800 dark:text-emerald-300">4. นำเข้าข้อมูล</span>
                 <p className="mt-1">กด &ldquo;นำเข้า&rdquo; เพื่อบันทึกข้อมูลทั้งหมดพร้อมกัน</p>
               </li>
             </ol>
-          </div>
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -534,17 +546,33 @@ export function StudentsView({
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
 
       {/* Tab 3: Class Management */}
       {activeTab === 'manage' && (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <label htmlFor="manage-class-select" className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                เลือกชั้นเรียน:
-              </label>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-sky-100/80 dark:border-sky-900/50 bg-gradient-to-r from-sky-50/90 via-indigo-50/60 to-transparent dark:from-sky-950/40 dark:via-indigo-950/30 dark:to-transparent px-6 py-4">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-indigo-600 text-white shadow-xs shrink-0">
+              <School className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                จัดการรายชื่อนักเรียนตามชั้นเรียน
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                เลือกชั้นเรียนเพื่อลบรายชื่อเป็นกลุ่มหรือล้างทั้งห้อง
+              </p>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <label htmlFor="manage-class-select" className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                  เลือกชั้นเรียน:
+                </label>
               <select
                 id="manage-class-select"
                 value={manageClass}
@@ -668,30 +696,36 @@ export function StudentsView({
               })}
             </div>
           )}
+          </div>
         </div>
       )}
 
       {/* Full Students Table */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              ตารางรายชื่อนักเรียน
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono-num">
-              แสดง {filteredStudents.length} จาก {students.length} คน
-            </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-sky-100/80 dark:border-sky-900/50 bg-gradient-to-r from-sky-50/90 via-cyan-50/60 to-transparent dark:from-sky-950/40 dark:via-cyan-950/30 dark:to-transparent">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-cyan-600 text-white shadow-xs shrink-0">
+              <School className="h-4 w-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                ตารางรายชื่อนักเรียน
+              </h3>
+              <p className="text-xs text-sky-700 dark:text-sky-300 font-mono-num font-medium">
+                แสดง {filteredStudents.length} จาก {students.length} คน
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-sky-500 dark:text-sky-400" />
               <input
                 type="text"
                 value={tableSearch}
                 onChange={(e) => setTableSearch(e.target.value)}
                 placeholder="ค้นหาชื่อนักเรียน..."
-                className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
             </div>
 
@@ -699,7 +733,7 @@ export function StudentsView({
               value={tableClassFilter}
               onChange={(e) => setTableClassFilter(e.target.value)}
               aria-label="กรองตามชั้นเรียน"
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
             >
               <option value="all">ทุกชั้นเรียน</option>
               {CLASS_LIST.map((cls) => (
@@ -718,7 +752,7 @@ export function StudentsView({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <thead className="bg-gradient-to-r from-sky-50/80 via-cyan-50/60 to-blue-50/70 dark:from-sky-950/40 dark:via-cyan-950/30 dark:to-blue-950/30 text-xs font-semibold text-sky-900 dark:text-sky-200 border-b border-sky-100 dark:border-sky-900/50">
                 <tr>
                   <th className="px-6 py-3 w-20">เลขที่</th>
                   <th className="px-4 py-3">ชื่อ-สกุล</th>
@@ -728,21 +762,21 @@ export function StudentsView({
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredStudents.map((stu) => (
-                  <tr key={stu.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr key={stu.id} className="hover:bg-sky-50/40 dark:hover:bg-sky-950/25 transition-colors">
                     <td className="px-6 py-2.5 font-mono-num text-xs text-slate-600 dark:text-slate-400">
                       {stu.number ?? '-'}
                     </td>
                     <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">
                       {stu.name}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">
+                    <td className="px-4 py-2.5 font-medium text-sky-700 dark:text-sky-300">
                       {stu.className}
                     </td>
                     <td className="px-6 py-2.5 text-right whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => handleStartEdit(stu)}
-                        className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-400 transition-colors"
+                        className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-sky-950/60 dark:hover:text-sky-300 transition-colors"
                         title="แก้ไข"
                         aria-label={`แก้ไข ${stu.name}`}
                       >

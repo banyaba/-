@@ -371,14 +371,14 @@ export function AddDataView({
     <div className="space-y-6">
       {/* Segmented Mode Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 p-1">
+        <div className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200/80 dark:border-blue-900/60 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 dark:from-slate-900 dark:to-blue-950/40 p-1.5">
           <button
             type="button"
             onClick={() => setActiveTab('individual')}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'individual'
-                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/70 hover:text-blue-700 dark:hover:text-blue-300'
             }`}
           >
             <UserPlus className="h-4 w-4" />
@@ -390,10 +390,10 @@ export function AddDataView({
               if (editingLog) onCancelEdit();
               setActiveTab('batch');
             }}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'batch'
-                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/70 hover:text-blue-700 dark:hover:text-blue-300'
             }`}
           >
             <Users className="h-4 w-4" />
@@ -402,7 +402,7 @@ export function AddDataView({
         </div>
 
         {editingLog && activeTab === 'individual' && (
-          <div className="flex items-center gap-3 text-xs font-medium text-amber-700 dark:text-amber-400">
+          <div className="flex items-center gap-3 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-amber-50/80 dark:bg-amber-950/40 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
             <span>กำลังแก้ไขข้อมูลของ: {editingLog.studentName}</span>
             <button
               type="button"
@@ -410,7 +410,7 @@ export function AddDataView({
                 onCancelEdit();
                 resetIndividualForm();
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="inline-flex items-center gap-1 rounded-md border border-amber-300/80 dark:border-amber-700 bg-white dark:bg-slate-800 px-2 py-0.5 text-slate-700 dark:text-slate-200 hover:bg-amber-100/60 dark:hover:bg-slate-700"
             >
               <X className="h-3.5 w-3.5" />
               <span>ยกเลิกการแก้ไข</span>
@@ -423,8 +423,24 @@ export function AddDataView({
       {activeTab === 'individual' ? (
         <form
           onSubmit={handleIndividualSubmit}
-          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-6"
+          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden"
         >
+          <div className="flex items-center justify-between gap-3 border-b border-blue-100/80 dark:border-blue-900/50 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-transparent dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-transparent px-6 py-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-xs shrink-0">
+                <UserPlus className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {editingLog ? 'แก้ไขบันทึกการใช้ห้องคอมพิวเตอร์' : 'บันทึกการใช้ห้องคอมพิวเตอร์รายบุคคล'}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  เลือกห้อง เครื่องที่ใช้ รายชื่อนักเรียน และรูปแบบการใช้งาน
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label htmlFor="ind-date" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -648,16 +664,43 @@ export function AddDataView({
                 <button
                   type="button"
                   onClick={() => setManageModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/70 bg-indigo-50/70 dark:bg-indigo-950/40 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 transition-colors"
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   <span>{role === 'admin' ? 'เพิ่ม / แก้ไข / ลบตัวเลือก' : 'เพิ่ม / แก้ไขตัวเลือก'}</span>
                 </button>
               </div>
             </div>
+            {/* Inline Custom Usage Input (Top) */}
+            <div className="mb-3 flex flex-col sm:flex-row gap-2">
+              <input
+                id="ind-custom-usage"
+                type="text"
+                value={indCustomUsage}
+                onChange={(e) => setIndCustomUsage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleQuickAddUsageType('individual');
+                  }
+                }}
+                placeholder="เพิ่มรูปแบบการใช้งานเอง (เช่น ตัดต่อวิดีโอ, สอบออนไลน์)..."
+                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                disabled={addingCustomUsage || !indCustomUsage.trim()}
+                onClick={() => handleQuickAddUsageType('individual')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800/80 bg-blue-50 dark:bg-blue-950/60 px-3.5 py-2 text-xs font-semibold text-blue-700 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/60 disabled:opacity-50 whitespace-nowrap shrink-0 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>{addingCustomUsage ? 'กำลังเพิ่ม...' : 'เพิ่มและเลือก'}</span>
+              </button>
+            </div>
+
             {indDisplayUsageTypes.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 px-4 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
-                ยังไม่มีตัวเลือกรูปแบบการใช้ กรอกเพิ่มด้านล่างหรือกดปุ่มจัดการตัวเลือก
+                ยังไม่มีตัวเลือกรูปแบบการใช้ กรอกเพิ่มด้านบนหรือกดปุ่มจัดการตัวเลือก
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
@@ -668,8 +711,8 @@ export function AddDataView({
                       key={type}
                       className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-xs font-medium cursor-pointer transition-colors ${
                         checked
-                          ? 'border-blue-500 bg-blue-50/70 text-blue-900 dark:border-blue-500 dark:bg-blue-950/50 dark:text-blue-200'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                          ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50/80 text-blue-900 dark:border-blue-500/80 dark:from-blue-950/60 dark:to-indigo-950/50 dark:text-blue-100'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:border-blue-200 hover:bg-blue-50/30 dark:hover:bg-slate-800'
                       }`}
                     >
                       <input
@@ -684,33 +727,6 @@ export function AddDataView({
                 })}
               </div>
             )}
-
-            {/* Inline Custom Usage Input */}
-            <div className="mt-3 flex flex-col sm:flex-row gap-2">
-              <input
-                id="ind-custom-usage"
-                type="text"
-                value={indCustomUsage}
-                onChange={(e) => setIndCustomUsage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleQuickAddUsageType('individual');
-                  }
-                }}
-                placeholder="เพิ่มรูปแบบการใช้เอง (เช่น ตัดต่อวิดีโอ, สอบออนไลน์)..."
-                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="button"
-                disabled={addingCustomUsage || !indCustomUsage.trim()}
-                onClick={() => handleQuickAddUsageType('individual')}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 whitespace-nowrap shrink-0 transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>{addingCustomUsage ? 'กำลังเพิ่ม...' : 'เพิ่มและเลือก'}</span>
-              </button>
-            </div>
           </div>
 
           <div>
@@ -758,13 +774,30 @@ export function AddDataView({
               </span>
             </button>
           </div>
+          </div>
         </form>
       ) : (
         /* Tab 2: Batch Class Entry */
         <form
           onSubmit={handleBatchSubmit}
-          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-6"
+          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden"
         >
+          <div className="flex items-center justify-between gap-3 border-b border-indigo-100/80 dark:border-indigo-900/50 bg-gradient-to-r from-indigo-50/90 via-blue-50/70 to-transparent dark:from-indigo-950/40 dark:via-blue-950/30 dark:to-transparent px-6 py-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-xs shrink-0">
+                <Users className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  บันทึกการใช้ห้องคอมพิวเตอร์แบบรายชั้นเรียน
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  เลือกทั้งห้อง เรียงหมายเลขเครื่อง 1–30 อัตโนมัติ และบันทึกพร้อมกัน
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label htmlFor="batch-date" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -931,7 +964,7 @@ export function AddDataView({
                       key={stu.id}
                       className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                         isSelected
-                          ? 'border-blue-500 bg-blue-50/70 text-slate-900 dark:border-blue-500 dark:bg-blue-950/40 dark:text-slate-100'
+                          ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50/70 text-slate-900 dark:border-blue-500/80 dark:from-blue-950/50 dark:to-indigo-950/40 dark:text-slate-100'
                           : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-700 dark:text-slate-300'
                       }`}
                     >
@@ -989,16 +1022,43 @@ export function AddDataView({
                 <button
                   type="button"
                   onClick={() => setManageModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/70 bg-indigo-50/70 dark:bg-indigo-950/40 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 transition-colors"
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   <span>{role === 'admin' ? 'เพิ่ม / แก้ไข / ลบตัวเลือก' : 'เพิ่ม / แก้ไขตัวเลือก'}</span>
                 </button>
               </div>
             </div>
+            {/* Inline Custom Usage Input (Top) */}
+            <div className="mb-3 flex flex-col sm:flex-row gap-2">
+              <input
+                id="batch-custom-usage"
+                type="text"
+                value={batchCustomUsage}
+                onChange={(e) => setBatchCustomUsage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleQuickAddUsageType('batch');
+                  }
+                }}
+                placeholder="เพิ่มรูปแบบการใช้งานเอง (เช่น ตัดต่อวิดีโอ, สอบออนไลน์)..."
+                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                disabled={addingCustomUsage || !batchCustomUsage.trim()}
+                onClick={() => handleQuickAddUsageType('batch')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800/80 bg-blue-50 dark:bg-blue-950/60 px-3.5 py-2 text-xs font-semibold text-blue-700 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/60 disabled:opacity-50 whitespace-nowrap shrink-0 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>{addingCustomUsage ? 'กำลังเพิ่ม...' : 'เพิ่มและเลือก'}</span>
+              </button>
+            </div>
+
             {batchDisplayUsageTypes.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 px-4 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
-                ยังไม่มีตัวเลือกรูปแบบการใช้ กรอกเพิ่มด้านล่างหรือกดปุ่มจัดการตัวเลือก
+                ยังไม่มีตัวเลือกรูปแบบการใช้ กรอกเพิ่มด้านบนหรือกดปุ่มจัดการตัวเลือก
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
@@ -1009,8 +1069,8 @@ export function AddDataView({
                       key={type}
                       className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-xs font-medium cursor-pointer transition-colors ${
                         checked
-                          ? 'border-blue-500 bg-blue-50/70 text-blue-900 dark:border-blue-500 dark:bg-blue-950/50 dark:text-blue-200'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                          ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50/80 text-blue-900 dark:border-blue-500/80 dark:from-blue-950/60 dark:to-indigo-950/50 dark:text-blue-100'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:border-blue-200 hover:bg-blue-50/30 dark:hover:bg-slate-800'
                       }`}
                     >
                       <input
@@ -1025,40 +1085,13 @@ export function AddDataView({
                 })}
               </div>
             )}
-
-            {/* Inline Custom Usage Input */}
-            <div className="mt-3 flex flex-col sm:flex-row gap-2">
-              <input
-                id="batch-custom-usage"
-                type="text"
-                value={batchCustomUsage}
-                onChange={(e) => setBatchCustomUsage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleQuickAddUsageType('batch');
-                  }
-                }}
-                placeholder="เพิ่มรูปแบบการใช้เอง (เช่น ตัดต่อวิดีโอ, สอบออนไลน์)..."
-                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="button"
-                disabled={addingCustomUsage || !batchCustomUsage.trim()}
-                onClick={() => handleQuickAddUsageType('batch')}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 whitespace-nowrap shrink-0 transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>{addingCustomUsage ? 'กำลังเพิ่ม...' : 'เพิ่มและเลือก'}</span>
-              </button>
-            </div>
           </div>
 
           <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
             <button
               type="submit"
               disabled={batchSaving || selectedStudentIds.length === 0}
-              className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-50 whitespace-nowrap"
+              className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-50 whitespace-nowrap"
               style={{ backgroundColor: 'var(--theme-primary)' }}
             >
               <Zap className="h-4 w-4" />
@@ -1068,6 +1101,7 @@ export function AddDataView({
                   : `บันทึกรายชั้น (${selectedStudentIds.length} คน)`}
               </span>
             </button>
+          </div>
           </div>
         </form>
       )}

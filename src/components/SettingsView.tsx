@@ -227,13 +227,16 @@ export function SettingsView({
     <div className="space-y-6">
     <form onSubmit={handleSave} className="space-y-6">
       {/* School Settings */}
-      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5">
-        <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <School className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+        <div className="flex items-center gap-3 border-b border-blue-100/80 dark:border-blue-900/50 bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-transparent dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-transparent px-6 py-4">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-xs shrink-0">
+            <School className="h-4 w-4" />
+          </span>
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
             ข้อมูลโรงเรียนและผู้รับผิดชอบ
           </h2>
         </div>
+        <div className="p-6 space-y-5">
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -278,13 +281,16 @@ export function SettingsView({
             />
           </div>
         </div>
+        </div>
       </section>
 
       {/* Recolorable Theme Settings */}
-      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Palette className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-purple-100/80 dark:border-purple-900/50 bg-gradient-to-r from-purple-50/90 via-fuchsia-50/60 to-transparent dark:from-purple-950/40 dark:via-fuchsia-950/30 dark:to-transparent px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white shadow-xs shrink-0">
+              <Palette className="h-4 w-4" />
+            </span>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               ปรับแต่งชุดสีระบบ (Recolorable)
             </h2>
@@ -293,13 +299,14 @@ export function SettingsView({
           <button
             type="button"
             onClick={() => handleApplyPreset(DEFAULT_THEME_COLORS)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 dark:border-purple-800/70 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-200 hover:bg-purple-50 dark:hover:bg-slate-700 transition-colors"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>รีเซ็ตสีเริ่มต้น</span>
           </button>
         </div>
 
+        <div className="p-6 space-y-5">
         {/* Presets */}
         <div>
           <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
@@ -375,13 +382,16 @@ export function SettingsView({
             <span>{saving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}</span>
           </button>
         </div>
+        </div>
       </section>
     </form>
 
     {/* Usage Types Management Section */}
-    <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5">
-      <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-        <ListChecks className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+    <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+      <div className="flex items-center gap-3 border-b border-emerald-100/80 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-transparent dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-transparent px-6 py-4">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-xs shrink-0">
+          <ListChecks className="h-4 w-4" />
+        </span>
         <div>
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
             จัดการรูปแบบการใช้ห้องคอมพิวเตอร์
@@ -392,18 +402,22 @@ export function SettingsView({
         </div>
       </div>
 
-      <UsageTypesManagerPanel
-        usageTypes={usageTypes}
-        onUsageTypesChanged={(next) => onUsageTypesChanged(next)}
-        onNotify={onNotify}
-      />
+      <div className="p-6">
+        <UsageTypesManagerPanel
+          usageTypes={usageTypes}
+          onUsageTypesChanged={(next) => onUsageTypesChanged(next)}
+          onNotify={onNotify}
+        />
+      </div>
     </section>
 
     {/* 6-Digit PIN Security Configuration Section */}
-    <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-6 space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+    <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-100/80 dark:border-amber-900/50 bg-gradient-to-r from-amber-50/90 via-orange-50/60 to-transparent dark:from-amber-950/40 dark:via-orange-950/30 dark:to-transparent px-6 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-xs shrink-0">
+            <KeyRound className="h-4 w-4" />
+          </span>
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               ตั้งค่ารหัสผ่านเข้าสู่ระบบ 6 หลัก (PIN)
@@ -418,14 +432,14 @@ export function SettingsView({
           type="button"
           disabled={savingPins}
           onClick={() => void handleResetDefaultPins()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           <span>รีเซ็ตเป็นค่าเริ่มต้น</span>
         </button>
       </div>
 
-      <form onSubmit={handleSavePins} className="space-y-4">
+      <form onSubmit={handleSavePins} className="p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="pin-admin-6" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -439,7 +453,7 @@ export function SettingsView({
               value={newAdminPin}
               onChange={(e) => setNewAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="กรอกเลข 6 หลักใหม่ (เว้นว่างถ้าไม่เปลี่ยน)"
-              className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
@@ -455,7 +469,7 @@ export function SettingsView({
               value={newUserPin}
               onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="กรอกเลข 6 หลักใหม่ (เว้นว่างถ้าไม่เปลี่ยน)"
-              className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
         </div>
@@ -464,7 +478,7 @@ export function SettingsView({
           <button
             type="submit"
             disabled={savingPins || (!newAdminPin && !newUserPin)}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-55"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-55"
             style={{ backgroundColor: 'var(--theme-primary)' }}
           >
             <Save className="h-3.5 w-3.5" />
@@ -475,10 +489,12 @@ export function SettingsView({
     </section>
 
     {/* Data Management / Clear Data Section */}
-    <section className="rounded-xl border border-rose-200 dark:border-rose-900/70 bg-[var(--theme-surface)] p-6 space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+    <section className="rounded-xl border border-rose-200 dark:border-rose-900/70 bg-[var(--theme-surface)] overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rose-100/80 dark:border-rose-900/50 bg-gradient-to-r from-rose-50/90 via-pink-50/60 to-transparent dark:from-rose-950/40 dark:via-pink-950/30 dark:to-transparent px-6 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-rose-600 to-pink-600 text-white shadow-xs shrink-0">
+            <Database className="h-4 w-4" />
+          </span>
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               จัดการและล้างข้อมูลในระบบ
@@ -489,11 +505,12 @@ export function SettingsView({
           </div>
         </div>
 
-        <div className="font-mono-num text-xs text-slate-500 dark:text-slate-400">
+        <div className="font-mono-num text-xs font-medium text-rose-700 dark:text-rose-300">
           การใช้งาน {counts.logs.toLocaleString('th-TH')} · นักเรียน {counts.students.toLocaleString('th-TH')} · รายวิชา {counts.subjects.toLocaleString('th-TH')}
         </div>
       </div>
 
+      <div className="p-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Option 1: Delete usage logs only */}
         <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
@@ -540,6 +557,7 @@ export function SettingsView({
             </button>
           </div>
         </div>
+      </div>
       </div>
     </section>
 

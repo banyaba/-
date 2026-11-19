@@ -89,113 +89,131 @@ export function DataTableView({
   return (
     <div className="space-y-5">
       {/* 4 Filters Toolbar */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] p-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <div>
-            <label htmlFor="filter-name" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              ค้นหาชื่อ
-            </label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                id="filter-name"
-                type="text"
-                value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
-                placeholder="พิมพ์ชื่อนักเรียน..."
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-teal-100/80 dark:border-teal-900/50 bg-gradient-to-r from-teal-50/90 via-emerald-50/60 to-transparent dark:from-teal-950/40 dark:via-emerald-950/30 dark:to-transparent px-5 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-emerald-600 text-white shadow-xs shrink-0">
+              <Search className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                ค้นหาและกรองประวัติการใช้งาน
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                กรองตามชื่อนักเรียน วันที่ ชั้นเรียน หรือรายวิชา
+              </p>
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="filter-date" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              ค้นหาวันที่
-            </label>
-            <div className="relative">
-              <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                id="filter-date"
-                type="date"
-                value={searchDate}
-                onChange={(e) => setSearchDate(e.target.value)}
-                className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="filter-class" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              ค้นหาชั้นเรียน
-            </label>
-            <select
-              id="filter-class"
-              value={searchClass}
-              onChange={(e) => setSearchClass(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">ทุกชั้นเรียน</option>
-              {CLASS_LIST.map((cls) => (
-                <option key={cls} value={cls}>
-                  {cls}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="filter-subject" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              ค้นหาวิชา
-            </label>
-            <select
-              id="filter-subject"
-              value={searchSubject}
-              onChange={(e) => setSearchSubject(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">ทุกรายวิชา</option>
-              {subjectOptions.map((sub) => (
-                <option key={sub} value={sub}>
-                  {sub}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
 
-        <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="font-mono-num text-xs font-medium text-slate-600 dark:text-slate-400">
-              แสดง {filteredLogs.length.toLocaleString('th-TH')} จาก {logs.length.toLocaleString('th-TH')} รายการ
-            </span>
-            {hasFilters && (
+        <div className="p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div>
+              <label htmlFor="filter-name" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                ค้นหาชื่อ
+              </label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-teal-500 dark:text-teal-400" />
+                <input
+                  id="filter-name"
+                  type="text"
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                  placeholder="พิมพ์ชื่อนักเรียน..."
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="filter-date" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                ค้นหาวันที่
+              </label>
+              <div className="relative">
+                <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-teal-500 dark:text-teal-400" />
+                <input
+                  id="filter-date"
+                  type="date"
+                  value={searchDate}
+                  onChange={(e) => setSearchDate(e.target.value)}
+                  className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="filter-class" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                ค้นหาชั้นเรียน
+              </label>
+              <select
+                id="filter-class"
+                value={searchClass}
+                onChange={(e) => setSearchClass(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="all">ทุกชั้นเรียน</option>
+                {CLASS_LIST.map((cls) => (
+                  <option key={cls} value={cls}>
+                    {cls}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="filter-subject" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                ค้นหาวิชา
+              </label>
+              <select
+                id="filter-subject"
+                value={searchSubject}
+                onChange={(e) => setSearchSubject(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="all">ทุกรายวิชา</option>
+                {subjectOptions.map((sub) => (
+                  <option key={sub} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="font-mono-num text-xs font-semibold text-teal-700 dark:text-teal-300">
+                แสดง {filteredLogs.length.toLocaleString('th-TH')} จาก {logs.length.toLocaleString('th-TH')} รายการ
+              </span>
+              {hasFilters && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchName('');
+                    setSearchDate('');
+                    setSearchClass('all');
+                    setSearchSubject('all');
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md bg-teal-50 dark:bg-teal-950/50 px-2.5 py-1 text-xs font-medium text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-colors"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>ล้างตัวกรอง</span>
+                </button>
+              )}
+            </div>
+
+            {role === 'admin' && (
               <button
                 type="button"
-                onClick={() => {
-                  setSearchName('');
-                  setSearchDate('');
-                  setSearchClass('all');
-                  setSearchSubject('all');
-                }}
-                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                disabled={todayCount === 0}
+                onClick={() => setConfirmDeleteToday(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-800/80 bg-rose-50 dark:bg-rose-950/50 px-3.5 py-1.5 text-xs font-medium text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 disabled:opacity-50 transition-colors whitespace-nowrap"
               >
-                <RotateCcw className="h-3 w-3" />
-                <span>ล้างตัวกรอง</span>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>ลบข้อมูลวันนี้ทั้งหมด ({todayCount})</span>
               </button>
             )}
           </div>
-
-          {role === 'admin' && (
-            <button
-              type="button"
-              disabled={todayCount === 0}
-              onClick={() => setConfirmDeleteToday(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-800/80 bg-rose-50 dark:bg-rose-950/50 px-3.5 py-1.5 text-xs font-medium text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 disabled:opacity-50 transition-colors whitespace-nowrap"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>ลบข้อมูลวันนี้ทั้งหมด ({todayCount})</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -208,7 +226,7 @@ export function DataTableView({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <thead className="bg-gradient-to-r from-teal-50/90 via-emerald-50/60 to-sky-50/70 dark:from-teal-950/40 dark:via-emerald-950/30 dark:to-sky-950/30 text-xs font-semibold text-teal-900 dark:text-teal-200 border-b border-teal-100 dark:border-teal-900/50">
                 <tr>
                   <th className="px-5 py-3 w-14">#</th>
                   <th className="px-4 py-3 whitespace-nowrap">วันที่</th>
@@ -223,7 +241,7 @@ export function DataTableView({
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredLogs.map((log, index) => (
-                  <tr key={log.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr key={log.id} className="hover:bg-teal-50/40 dark:hover:bg-teal-950/25 transition-colors">
                     <td className="px-5 py-2.5 font-mono-num text-xs text-slate-500 dark:text-slate-400">
                       {index + 1}
                     </td>
@@ -243,7 +261,7 @@ export function DataTableView({
                     <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {log.studentName}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-4 py-2.5 font-medium text-teal-700 dark:text-teal-300 whitespace-nowrap">
                       {log.className}
                     </td>
                     <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">
@@ -256,7 +274,7 @@ export function DataTableView({
                       <button
                         type="button"
                         onClick={() => onEditLog(log)}
-                        className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-400 transition-colors"
+                        className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 hover:bg-teal-50 hover:text-teal-700 dark:text-slate-400 dark:hover:bg-teal-950/60 dark:hover:text-teal-300 transition-colors"
                         title="แก้ไข"
                         aria-label={`แก้ไขรายการของ ${log.studentName}`}
                       >
