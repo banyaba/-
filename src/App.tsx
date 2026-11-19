@@ -1119,6 +1119,7 @@ export default function App() {
               {activePage === 'settings' && role === 'admin' && (
                 <SettingsView
                   settings={settings}
+                  students={students}
                   usageTypes={usageTypes}
                   pinHashes={pinHashes}
                   activeAdminId={activeAdminId}
@@ -1129,6 +1130,7 @@ export default function App() {
                     subjects: subjects.length,
                   }}
                   onSettingsUpdated={setSettings}
+                  onStudentsChanged={setStudents}
                   onUsageTypesChanged={setUsageTypes}
                   onPinHashesChanged={setPinHashes}
                   onClearLogsOnly={() => setLogs([])}

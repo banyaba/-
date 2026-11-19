@@ -1043,6 +1043,277 @@ export const firestoreApi = {
     }
   },
 
+  promoteStudentsAllGrades: async (options: {
+    p6Action: 'delete' | 'keep';
+    nextAcademicYear?: string;
+  }): Promise<{
+    promotedCount: number;
+    deletedP6Count: number;
+    updatedStudents: Student[];
+    updatedAcademicYear?: string;
+  }> => {
+    const uid = getActorUid();
+    let cleanNextYear: string | undefined;
+    if (options.nextAcademicYear !== undefined) {
+      const trimmed = clampString(options.nextAcademicYear, LIMITS.ACADEMIC_YEAR_MAX);
+      if (trimmed) {
+        if (trimmed.length < 4) {
+          throw new Error('ปีการศึกษา (พ.ศ.) ต้องมีความยาวอย่างน้อย 4 หลัก เช่น 2570');
+        }
+        cleanNextYear = trimmed;
+      }
+    }
+
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'students'), where('visibility', '==', 'school'))
+      );
+
+      const ops: Array<
+        | { type: 'update'; ref: ReturnType<typeof doc>; data: Record<string, unknown> }
+        | { type: 'delete'; ref: ReturnType<typeof doc> }
+        | { type: 'set'; ref: ReturnType<typeof doc>; data: Record<string, unknown> }
+      > = [];
+
+      let promotedCount = 0;
+      let deletedP6Count = 0;
+      const updatedStudents: Student[] = [];
+
+      for (const d of snap.docs) {
+        const stu = mapStudent(d.id, d.data() as Record<string, unknown>);
+        const match = /^ป\.([1-6])\/([1-3])$/.exec(stu.className.trim());
+        if (!match) {
+          updatedStudents.push(stu);
+          continue;
+        }
+        const grade = Number(match[1]);
+        const room = match[2];
+
+        if (grade >= 1 && grade <= 5) {
+          const nextClass = assertValidClassName(`ป.${grade + 1}/${room}`);
+          ops.push({
+            type: 'update',
+            ref: d.ref,
+            data: {
+              className: nextClass,
+              updatedAt: serverTimestamp(),
+            },
+          });
+          promotedCount += 1;
+          updatedStudents.push({ ...stu, className: nextClass });
+        } else if (grade === 6) {
+          if (options.p6Action === 'delete') {
+            ops.push({ type: 'delete', ref: d.ref });
+            deletedP6Count += 1;
+          } else {
+            updatedStudents.push(stu);
+          }
+        } else {
+          updatedStudents.push(stu);
+        }
+      }
+
+      if (promotedCount === 0 && deletedP6Count === 0 && !cleanNextYear) {
+        throw new Error('ไม่พบรายชื่อนักเรียนที่สามารถปรับระดับชั้นได้');
+      }
+
+      if (cleanNextYear) {
+        const settingsRef = doc(db, 'settings', 'app');
+        const settingsSnap = await getDoc(settingsRef);
+        if (settingsSnap.exists()) {
+          ops.push({
+            type: 'update',
+            ref: settingsRef,
+            data: {
+              academicYear: cleanNextYear,
+              updatedAt: serverTimestamp(),
+            },
+          });
+        } else {
+          ops.push({
+            type: 'set',
+            ref: settingsRef,
+            data: {
+              schoolName: DEFAULT_SETTINGS.schoolName,
+              academicYear: cleanNextYear,
+              labManager: DEFAULT_SETTINGS.labManager,
+              labManagers: sanitizeLabManagers(undefined, DEFAULT_SETTINGS.labManager),
+              colors: sanitizeThemeColors(),
+              usageTypes: [...DEFAULT_USAGE_TYPES],
+              scheduleTimes: sanitizeScheduleTimes(undefined),
+              ownerId: uid,
+              visibility: 'school',
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+      }
+
+      const CHUNK = 400;
+      for (let i = 0; i < ops.length; i += CHUNK) {
+        const batch = writeBatch(db);
+        for (const op of ops.slice(i, i + CHUNK)) {
+          if (op.type === 'update') {
+            batch.update(op.ref, op.data);
+          } else if (op.type === 'delete') {
+            batch.delete(op.ref);
+          } else {
+            batch.set(op.ref, op.data);
+          }
+        }
+        await batch.commit();
+      }
+
+      return {
+        promotedCount,
+        deletedP6Count,
+        updatedStudents,
+        updatedAcademicYear: cleanNextYear,
+      };
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.message.includes('ปีการศึกษา') || err.message.includes('ไม่พบรายชื่อนักเรียน'))
+      ) {
+        throw err;
+      }
+      handleFirestoreError(err, OperationType.WRITE, 'students');
+    }
+  },
+
+  moveStudentsClass: async (options: {
+    fromClass: string;
+    toClass: string;
+    studentIds?: string[];
+    nextAcademicYear?: string;
+  }): Promise<{
+    movedCount: number;
+    updatedStudents: Student[];
+    updatedAcademicYear?: string;
+  }> => {
+    const uid = getActorUid();
+    const safeFrom = assertValidClassName(options.fromClass);
+    const safeTo = assertValidClassName(options.toClass);
+    if (safeFrom === safeTo) {
+      throw new Error('กรุณาเลือกชั้นเรียนปลายทางที่แตกต่างจากชั้นเรียนเดิม');
+    }
+
+    let cleanNextYear: string | undefined;
+    if (options.nextAcademicYear !== undefined) {
+      const trimmed = clampString(options.nextAcademicYear, LIMITS.ACADEMIC_YEAR_MAX);
+      if (trimmed) {
+        if (trimmed.length < 4) {
+          throw new Error('ปีการศึกษา (พ.ศ.) ต้องมีความยาวอย่างน้อย 4 หลัก เช่น 2570');
+        }
+        cleanNextYear = trimmed;
+      }
+    }
+
+    const idFilter =
+      Array.isArray(options.studentIds) && options.studentIds.length > 0
+        ? new Set(options.studentIds.map((id) => sanitizeId(id)).filter(Boolean))
+        : null;
+
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'students'), where('visibility', '==', 'school'))
+      );
+
+      const ops: Array<
+        | { type: 'update'; ref: ReturnType<typeof doc>; data: Record<string, unknown> }
+        | { type: 'set'; ref: ReturnType<typeof doc>; data: Record<string, unknown> }
+      > = [];
+
+      let movedCount = 0;
+      const updatedStudents: Student[] = [];
+
+      for (const d of snap.docs) {
+        const stu = mapStudent(d.id, d.data() as Record<string, unknown>);
+        const matchesClass = stu.className === safeFrom;
+        const matchesId = idFilter === null || idFilter.has(stu.id);
+        if (matchesClass && matchesId) {
+          ops.push({
+            type: 'update',
+            ref: d.ref,
+            data: {
+              className: safeTo,
+              updatedAt: serverTimestamp(),
+            },
+          });
+          movedCount += 1;
+          updatedStudents.push({ ...stu, className: safeTo });
+        } else {
+          updatedStudents.push(stu);
+        }
+      }
+
+      if (movedCount === 0) {
+        throw new Error(`ไม่พบรายชื่อนักเรียนที่เลือกในชั้น ${safeFrom}`);
+      }
+
+      if (cleanNextYear) {
+        const settingsRef = doc(db, 'settings', 'app');
+        const settingsSnap = await getDoc(settingsRef);
+        if (settingsSnap.exists()) {
+          ops.push({
+            type: 'update',
+            ref: settingsRef,
+            data: {
+              academicYear: cleanNextYear,
+              updatedAt: serverTimestamp(),
+            },
+          });
+        } else {
+          ops.push({
+            type: 'set',
+            ref: settingsRef,
+            data: {
+              schoolName: DEFAULT_SETTINGS.schoolName,
+              academicYear: cleanNextYear,
+              labManager: DEFAULT_SETTINGS.labManager,
+              labManagers: sanitizeLabManagers(undefined, DEFAULT_SETTINGS.labManager),
+              colors: sanitizeThemeColors(),
+              usageTypes: [...DEFAULT_USAGE_TYPES],
+              scheduleTimes: sanitizeScheduleTimes(undefined),
+              ownerId: uid,
+              visibility: 'school',
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+      }
+
+      const CHUNK = 400;
+      for (let i = 0; i < ops.length; i += CHUNK) {
+        const batch = writeBatch(db);
+        for (const op of ops.slice(i, i + CHUNK)) {
+          if (op.type === 'update') {
+            batch.update(op.ref, op.data);
+          } else {
+            batch.set(op.ref, op.data);
+          }
+        }
+        await batch.commit();
+      }
+
+      return {
+        movedCount,
+        updatedStudents,
+        updatedAcademicYear: cleanNextYear,
+      };
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.message.includes('ปีการศึกษา') ||
+          err.message.includes('ไม่พบรายชื่อนักเรียน') ||
+          err.message.includes('ชั้นเรียน'))
+      ) {
+        throw err;
+      }
+      handleFirestoreError(err, OperationType.WRITE, 'students');
+    }
+  },
+
   // Subjects
   createSubject: async (payload: Omit<Subject, 'id' | 'createdAt'>): Promise<Subject> => {
     const uid = getActorUid();

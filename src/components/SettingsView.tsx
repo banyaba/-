@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Save,
   RotateCcw,
@@ -19,8 +19,17 @@ import {
   Check,
   Star,
   UserCheck,
+  GraduationCap,
+  ArrowRight,
+  AlertTriangle,
 } from 'lucide-react';
-import { DEFAULT_THEME_COLORS, type AppSettings, type ThemeColors } from '../types';
+import {
+  CLASS_LIST,
+  DEFAULT_THEME_COLORS,
+  type AppSettings,
+  type Student,
+  type ThemeColors,
+} from '../types';
 import { api } from '../api/client';
 import { UsageTypesManagerPanel } from './UsageTypesManagerModal';
 import { ConfirmModal } from './ConfirmModal';
@@ -41,6 +50,7 @@ import {
 
 interface SettingsViewProps {
   settings: AppSettings;
+  students: Student[];
   usageTypes: string[];
   pinHashes: PinHashes | null;
   activeAdminId?: string;
@@ -51,6 +61,7 @@ interface SettingsViewProps {
     subjects: number;
   };
   onSettingsUpdated: (next: AppSettings) => void;
+  onStudentsChanged: (next: Student[]) => void;
   onUsageTypesChanged: (next: string[]) => void;
   onPinHashesChanged: (next: PinHashes) => void;
   onClearLogsOnly: () => void;
@@ -95,14 +106,27 @@ const COLOR_PRESETS: { name: string; colors: ThemeColors }[] = [
   },
 ];
 
+function suggestNextClass(cls: string): string {
+  const m = /^ป\.([1-6])\/([1-3])$/.exec(cls.trim());
+  if (!m) return 'ป.6/1';
+  const grade = Number(m[1]);
+  const room = m[2];
+  if (grade < 6) {
+    return `ป.${grade + 1}/${room}`;
+  }
+  return `ป.5/${room}`;
+}
+
 export function SettingsView({
   settings,
+  students,
   usageTypes,
   pinHashes,
   activeAdminId = '',
   activeAdminName = '',
   counts,
   onSettingsUpdated,
+  onStudentsChanged,
   onUsageTypesChanged,
   onPinHashesChanged,
   onClearLogsOnly,
@@ -131,6 +155,32 @@ export function SettingsView({
   const [settingPrimaryIdx, setSettingPrimaryIdx] = useState<number | null>(null);
   const [colors, setColors] = useState<ThemeColors>(settings.colors);
   const [saving, setSaving] = useState(false);
+
+  // Grade Promotion State
+  const studentCountByClass = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const stu of students) {
+      map[stu.className] = (map[stu.className] || 0) + 1;
+    }
+    return map;
+  }, [students]);
+
+  const [promoMode, setPromoMode] = useState<'all' | 'room'>('all');
+  const [p6Action, setP6Action] = useState<'delete' | 'keep'>('delete');
+  const [updateYearOnPromote, setUpdateYearOnPromote] = useState(true);
+  const [targetAcademicYear, setTargetAcademicYear] = useState(() => {
+    const num = Number.parseInt(settings.academicYear, 10);
+    return Number.isFinite(num) && num >= 2500 ? String(num + 1) : '2570';
+  });
+  const [fromClass, setFromClass] = useState<string>(() => {
+    return CLASS_LIST.find((c) => (studentCountByClass[c] || 0) > 0 && !c.startsWith('ป.6/'))
+      || CLASS_LIST.find((c) => (studentCountByClass[c] || 0) > 0)
+      || 'ป.5/1';
+  });
+  const [toClass, setToClass] = useState<string>(() => suggestNextClass(fromClass));
+  const [excludedStudentIds, setExcludedStudentIds] = useState<string[]>([]);
+  const [promoConfirmOpen, setPromoConfirmOpen] = useState(false);
+  const [promoting, setPromoting] = useState(false);
 
   const [newAdminPin, setNewAdminPin] = useState('');
   const [newUserPin, setNewUserPin] = useState('');
@@ -896,6 +946,532 @@ export function SettingsView({
         </div>
       </section>
     </form>
+
+    {/* Grade Level Promotion Section */}
+    {(() => {
+      const gradeSummary = [1, 2, 3, 4, 5, 6].map((g) => {
+        const rooms = [1, 2, 3].map((r) => {
+          const cls = `ป.${g}/${r}`;
+          return { className: cls, count: studentCountByClass[cls] || 0 };
+        });
+        const total = rooms.reduce((acc, item) => acc + item.count, 0);
+        return { grade: g, rooms, total };
+      });
+
+      const promotableCount = gradeSummary
+        .filter((g) => g.grade <= 5)
+        .reduce((acc, g) => acc + g.total, 0);
+      const p6Count = gradeSummary.find((g) => g.grade === 6)?.total || 0;
+      const p5Count = gradeSummary.find((g) => g.grade === 5)?.total || 0;
+
+      const sourceStudents = students
+        .filter((s) => s.className === fromClass)
+        .sort((a, b) => (a.number ?? 999) - (b.number ?? 999) || a.name.localeCompare(b.name, 'th'));
+      const excludedSet = new Set(excludedStudentIds);
+      const selectedRoomStudents = sourceStudents.filter((s) => !excludedSet.has(s.id));
+      const destinationCount = studentCountByClass[toClass] || 0;
+
+      const handleStartPromote = () => {
+        if (updateYearOnPromote) {
+          const cleanYear = targetAcademicYear.trim();
+          if (cleanYear.length < 4) {
+            onNotify('error', 'ปีการศึกษา (พ.ศ.) ต้องมีอย่างน้อย 4 หลัก เช่น 2570');
+            return;
+          }
+        }
+        if (promoMode === 'all') {
+          if (promotableCount === 0 && !(p6Action === 'delete' && p6Count > 0)) {
+            onNotify('error', 'ยังไม่มีรายชื่อนักเรียนที่จะปรับระดับชั้น');
+            return;
+          }
+        } else {
+          if (fromClass === toClass) {
+            onNotify('error', 'กรุณาเลือกชั้นเรียนปลายทางที่แตกต่างจากชั้นเรียนเดิม');
+            return;
+          }
+          if (selectedRoomStudents.length === 0) {
+            onNotify('error', `กรุณาเลือกนักเรียนอย่างน้อย 1 คนในชั้น ${fromClass}`);
+            return;
+          }
+        }
+        setPromoConfirmOpen(true);
+      };
+
+      const handleConfirmPromote = async () => {
+        setPromoting(true);
+        try {
+          const nextYearArg = updateYearOnPromote ? targetAcademicYear.trim() : undefined;
+          if (promoMode === 'all') {
+            const res = await api.promoteStudentsAllGrades({
+              p6Action,
+              nextAcademicYear: nextYearArg,
+            });
+            onStudentsChanged(res.updatedStudents);
+            if (res.updatedAcademicYear) {
+              setAcademicYear(res.updatedAcademicYear);
+              const nextPlusOne = Number.parseInt(res.updatedAcademicYear, 10);
+              if (Number.isFinite(nextPlusOne)) {
+                setTargetAcademicYear(String(nextPlusOne + 1));
+              }
+              onSettingsUpdated({
+                ...settings,
+                schoolName: schoolName.trim() || settings.schoolName,
+                academicYear: res.updatedAcademicYear,
+                labManager,
+                labManagers,
+                colors,
+              });
+            }
+            const parts: string[] = [];
+            if (res.promotedCount > 0) parts.push(`เลื่อนชั้นนักเรียน ${res.promotedCount} คน`);
+            if (res.deletedP6Count > 0) parts.push(`ลบรายชื่อ ป.6 ที่จบการศึกษา ${res.deletedP6Count} คน`);
+            if (res.updatedAcademicYear) parts.push(`อัปเดตปีการศึกษาเป็น ${res.updatedAcademicYear}`);
+            onNotify('success', `ปรับระดับชั้นเรียนสำเร็จ: ${parts.join(' · ')}`);
+          } else {
+            const res = await api.moveStudentsClass({
+              fromClass,
+              toClass,
+              studentIds: selectedRoomStudents.map((s) => s.id),
+              nextAcademicYear: nextYearArg,
+            });
+            onStudentsChanged(res.updatedStudents);
+            setExcludedStudentIds([]);
+            if (res.updatedAcademicYear) {
+              setAcademicYear(res.updatedAcademicYear);
+              onSettingsUpdated({
+                ...settings,
+                schoolName: schoolName.trim() || settings.schoolName,
+                academicYear: res.updatedAcademicYear,
+                labManager,
+                labManagers,
+                colors,
+              });
+            }
+            onNotify(
+              'success',
+              `ปรับระดับชั้นนักเรียนจาก ${fromClass} เป็น ${toClass} จำนวน ${res.movedCount} คนเรียบร้อยแล้ว`
+            );
+          }
+          setPromoConfirmOpen(false);
+        } catch (err) {
+          onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถปรับระดับชั้นเรียนได้');
+        } finally {
+          setPromoting(false);
+        }
+      };
+
+      return (
+        <>
+          <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-100/80 dark:border-cyan-900/50 bg-gradient-to-r from-cyan-50/90 via-sky-50/60 to-transparent dark:from-cyan-950/40 dark:via-sky-950/30 dark:to-transparent px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-xs shrink-0">
+                  <GraduationCap className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    ปรับระดับชั้นเรียนประจำปีการศึกษา (เลื่อนชั้นเรียน)
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    ปรับระดับชั้นรายชื่อนักเรียนเมื่อขึ้นปีการศึกษาใหม่ เช่น ปี {academicYear} อยู่ ป.5/1 → ปรับเป็น ป.6/1 (ไม่กระทบประวัติการใช้งานย้อนหลัง)
+                  </p>
+                </div>
+              </div>
+
+              <div className="font-mono-num text-xs font-medium text-cyan-800 dark:text-cyan-300">
+                ปีการศึกษาปัจจุบัน: พ.ศ. {academicYear} · นักเรียนทั้งหมด {students.length.toLocaleString('th-TH')} คน
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Mode Switcher */}
+              <div className="inline-flex flex-wrap gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromoMode('all');
+                    setUpdateYearOnPromote(true);
+                  }}
+                  className={`rounded-lg px-3.5 py-2 text-xs font-semibold transition-all ${
+                    promoMode === 'all'
+                      ? 'bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100'
+                  }`}
+                >
+                  เลื่อนชั้นอัตโนมัติทั้งโรงเรียน (+1 ชั้น)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromoMode('room');
+                    setUpdateYearOnPromote(false);
+                  }}
+                  className={`rounded-lg px-3.5 py-2 text-xs font-semibold transition-all ${
+                    promoMode === 'room'
+                      ? 'bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100'
+                  }`}
+                >
+                  ปรับระดับชั้นเฉพาะห้อง (เช่น ป.5/1 → ป.6/1)
+                </button>
+              </div>
+
+              {promoMode === 'all' ? (
+                <div className="space-y-5">
+                  {/* Target Year + P6 Action */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 p-4 space-y-3">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={updateYearOnPromote}
+                          onChange={(e) => setUpdateYearOnPromote(e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>อัปเดตปีการศึกษาในระบบพร้อมกับการเลื่อนชั้น</span>
+                      </label>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          ปี {academicYear}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <div className="flex items-center gap-2 flex-1">
+                          <label htmlFor="promo-next-year" className="text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                            ปีการศึกษาใหม่ (พ.ศ.):
+                          </label>
+                          <input
+                            id="promo-next-year"
+                            type="text"
+                            maxLength={10}
+                            disabled={!updateYearOnPromote}
+                            value={targetAcademicYear}
+                            onChange={(e) => setTargetAcademicYear(e.target.value)}
+                            placeholder="2570"
+                            className="font-mono-num w-28 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 p-4 space-y-2.5">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        การจัดการนักเรียนชั้น ป.6 ปัจจุบัน ({p6Count} คน)
+                      </div>
+                      <div className="space-y-2">
+                        <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="p6-action"
+                            checked={p6Action === 'delete'}
+                            onChange={() => setP6Action('delete')}
+                            className="mt-0.5 h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>
+                            <strong>ลบรายชื่อนักเรียน ป.6 ออกจากระบบ (จบการศึกษา)</strong> — แนะนำเพื่อไม่ให้ปะปนกับ ป.5 ที่เลื่อนขึ้นมา
+                          </span>
+                        </label>
+                        <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="p6-action"
+                            checked={p6Action === 'keep'}
+                            onChange={() => setP6Action('keep')}
+                            className="mt-0.5 h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>คงรายชื่อนักเรียน ป.6 เดิมไว้ตามเดิม (ไม่ลบ)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {p6Action === 'keep' && p6Count > 0 && p5Count > 0 && (
+                    <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-amber-50/80 dark:bg-amber-950/30 px-4 py-3 text-xs text-amber-900 dark:text-amber-200">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>ข้อควรระวัง:</strong> ชั้น ป.6 มีนักเรียนอยู่แล้ว {p6Count} คน หากเลือกคงรายชื่อไว้ นักเรียน ป.5 ({p5Count} คน) ที่เลื่อนขึ้นมาจะถูกรวมอยู่ในชั้น ป.6 เดียวกัน
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Preview Mapping Grid */}
+                  <div>
+                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2.5">
+                      ตัวอย่างผลลัพธ์การเลื่อนระดับชั้น ({gradeSummary.reduce((a, g) => a + g.total, 0)} คน):
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {gradeSummary.map((item) => {
+                        const isP6 = item.grade === 6;
+                        const activeRooms = item.rooms.filter((r) => r.count > 0);
+                        return (
+                          <div
+                            key={item.grade}
+                            className={`rounded-lg border px-3.5 py-2.5 space-y-1.5 ${
+                              item.total > 0
+                                ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
+                                : 'border-slate-100 dark:border-slate-800/70 bg-slate-50/50 dark:bg-slate-900/40 opacity-65'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+                                <span>ป.{item.grade}</span>
+                                <ArrowRight className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                                <span
+                                  className={
+                                    isP6 && p6Action === 'delete'
+                                      ? 'text-rose-600 dark:text-rose-400'
+                                      : 'text-emerald-700 dark:text-emerald-400'
+                                  }
+                                >
+                                  {isP6
+                                    ? p6Action === 'delete'
+                                      ? 'จบการศึกษา (ลบรายชื่อ)'
+                                      : 'คงไว้ที่ ป.6'
+                                    : `ป.${item.grade + 1}`}
+                                </span>
+                              </div>
+                              <span className="font-mono-num text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                {item.total} คน
+                              </span>
+                            </div>
+
+                            {activeRooms.length > 0 ? (
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono-num">
+                                {activeRooms
+                                  .map((r) =>
+                                    isP6
+                                      ? `${r.className} (${r.count})`
+                                      : `${r.className}→ป.${item.grade + 1}/${r.className.split('/')[1]} (${r.count})`
+                                  )
+                                  .join(' · ')}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                                ไม่มีรายชื่อนักเรียน
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                      <label htmlFor="promo-from-class" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                        ชั้นเรียนเดิม (ปี {academicYear})
+                      </label>
+                      <select
+                        id="promo-from-class"
+                        value={fromClass}
+                        onChange={(e) => {
+                          const nextFrom = e.target.value;
+                          setFromClass(nextFrom);
+                          setExcludedStudentIds([]);
+                          const suggested = suggestNextClass(nextFrom);
+                          if (suggested !== nextFrom) {
+                            setToClass(suggested);
+                          }
+                        }}
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {CLASS_LIST.map((cls) => (
+                          <option key={cls} value={cls}>
+                            {cls} ({studentCountByClass[cls] || 0} คน)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="promo-to-class" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                        ปรับเป็นชั้นเรียนใหม่
+                      </label>
+                      <select
+                        id="promo-to-class"
+                        value={toClass}
+                        onChange={(e) => setToClass(e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {CLASS_LIST.map((cls) => (
+                          <option key={cls} value={cls} disabled={cls === fromClass}>
+                            {cls} ({studentCountByClass[cls] || 0} คน)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 px-3.5 py-2 space-y-1.5">
+                      <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={updateYearOnPromote}
+                          onChange={(e) => setUpdateYearOnPromote(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
+                        />
+                        <span>เปลี่ยนปีการศึกษาเป็น พ.ศ.</span>
+                      </label>
+                      {updateYearOnPromote && (
+                        <input
+                          type="text"
+                          maxLength={10}
+                          value={targetAcademicYear}
+                          onChange={(e) => setTargetAcademicYear(e.target.value)}
+                          placeholder="2570"
+                          className="font-mono-num w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-900 dark:text-slate-100"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {destinationCount > 0 && fromClass !== toClass && (
+                    <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-amber-50/80 dark:bg-amber-950/30 px-4 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        หมายเหตุ: ชั้นปลายทาง <strong>{toClass}</strong> มีนักเรียนอยู่แล้ว {destinationCount} คน หากดำเนินการต่อรายชื่อที่เลือกจะย้ายไปรวมกับห้อง {toClass}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Student Checklist for selected source class */}
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 border-b border-slate-200 dark:border-slate-800">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        รายชื่อนักเรียนในชั้น {fromClass} (เลือกย้าย {selectedRoomStudents.length}/{sourceStudents.length} คน)
+                      </span>
+                      {sourceStudents.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setExcludedStudentIds([])}
+                            className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                          >
+                            เลือกทั้งหมด
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setExcludedStudentIds(sourceStudents.map((s) => s.id))}
+                            className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                          >
+                            ไม่เลือกเลย
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {sourceStudents.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                        ไม่มีรายชื่อนักเรียนในชั้น {fromClass}
+                      </div>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        {sourceStudents.map((stu) => {
+                          const checked = !excludedSet.has(stu.id);
+                          return (
+                            <label
+                              key={stu.id}
+                              className="flex items-center justify-between gap-3 px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setExcludedStudentIds((prev) =>
+                                      prev.includes(stu.id)
+                                        ? prev.filter((id) => id !== stu.id)
+                                        : [...prev, stu.id]
+                                    );
+                                  }}
+                                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="font-mono-num text-slate-400 w-9 shrink-0">
+                                  {stu.number ? `เลขที่ ${stu.number}` : '-'}
+                                </span>
+                                <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
+                                  {stu.name}
+                                </span>
+                              </div>
+                              <span className="font-mono-num text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                                {fromClass} → {toClass}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {promoMode === 'all'
+                    ? `จะปรับระดับชั้น ป.1–ป.5 จำนวน ${promotableCount} คน${
+                        p6Action === 'delete' && p6Count > 0
+                          ? ` และลบ ป.6 ที่จบการศึกษา ${p6Count} คน`
+                          : ''
+                      }`
+                    : `จะย้ายนักเรียน ${fromClass} → ${toClass} จำนวน ${selectedRoomStudents.length} คน`}
+                </span>
+                <button
+                  type="button"
+                  disabled={
+                    promoting ||
+                    (promoMode === 'all'
+                      ? promotableCount === 0 && !(p6Action === 'delete' && p6Count > 0)
+                      : selectedRoomStudents.length === 0 || fromClass === toClass)
+                  }
+                  onClick={handleStartPromote}
+                  className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--theme-primary)' }}
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  <span>
+                    {promoMode === 'all'
+                      ? 'ดำเนินการเลื่อนระดับชั้นทั้งโรงเรียน'
+                      : `ยืนยันปรับชั้น ${fromClass} → ${toClass} (${selectedRoomStudents.length} คน)`}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <ConfirmModal
+            open={promoConfirmOpen}
+            danger={promoMode === 'all' && p6Action === 'delete' && p6Count > 0}
+            title={
+              promoMode === 'all'
+                ? 'ยืนยันการเลื่อนระดับชั้นทั้งโรงเรียน'
+                : `ยืนยันปรับระดับชั้น ${fromClass} → ${toClass}`
+            }
+            description={
+              promoMode === 'all'
+                ? `ต้องการเลื่อนชั้นนักเรียน ป.1–ป.5 ขึ้น 1 ระดับชั้น จำนวน ${promotableCount} คน${
+                    p6Action === 'delete' && p6Count > 0
+                      ? ` พร้อมลบรายชื่อนักเรียน ป.6 ที่จบการศึกษา ${p6Count} คน`
+                      : ''
+                  }${
+                    updateYearOnPromote
+                      ? ` และอัปเดตปีการศึกษาเป็น พ.ศ. ${targetAcademicYear.trim()}`
+                      : ''
+                  } หรือไม่? (ประวัติการใช้งานเดิมจะไม่เปลี่ยนแปลง)`
+                : `ต้องการปรับระดับชั้นนักเรียนจาก ${fromClass} เป็น ${toClass} จำนวน ${selectedRoomStudents.length} คน${
+                    updateYearOnPromote
+                      ? ` และอัปเดตปีการศึกษาเป็น พ.ศ. ${targetAcademicYear.trim()}`
+                      : ''
+                  } หรือไม่?`
+            }
+            confirmLabel={promoMode === 'all' ? 'ยืนยันเลื่อนชั้นเรียน' : 'ยืนยันปรับระดับชั้น'}
+            loading={promoting}
+            onConfirm={() => void handleConfirmPromote()}
+            onCancel={() => setPromoConfirmOpen(false)}
+          />
+        </>
+      );
+    })()}
 
     {/* Usage Types Management Section */}
     <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
