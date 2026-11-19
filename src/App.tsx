@@ -319,7 +319,11 @@ export default function App() {
 
     const startSync = async () => {
       try {
-        await seedInitialFirestoreIfEmpty();
+        try {
+          await seedInitialFirestoreIfEmpty();
+        } catch (seedErr) {
+          console.warn('Initial seed check skipped (using live/cached database):', seedErr);
+        }
         if (!active) return;
 
         let loadedSettings = false;

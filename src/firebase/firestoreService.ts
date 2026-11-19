@@ -3,7 +3,10 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
+  getDocsFromServer,
+  limit,
   onSnapshot,
   query,
   serverTimestamp,
@@ -12,6 +15,9 @@ import {
   updateDoc,
   where,
   writeBatch,
+  type DocumentData,
+  type DocumentReference,
+  type Query,
   type Unsubscribe,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
@@ -418,12 +424,28 @@ function buildDefaultSeed(): LabDatabase {
   };
 }
 
+async function getDocServerOrCache(ref: DocumentReference<DocumentData>) {
+  try {
+    return await getDocFromServer(ref);
+  } catch {
+    return await getDoc(ref);
+  }
+}
+
+async function getDocsServerOrCache(q: Query<DocumentData>) {
+  try {
+    return await getDocsFromServer(q);
+  } catch {
+    return await getDocs(q);
+  }
+}
+
 export async function seedInitialFirestoreIfEmpty(): Promise<void> {
   const uid = getActorUid();
   const settingsRef = doc(db, 'settings', 'app');
 
   try {
-    const snap = await getDoc(settingsRef);
+    const snap = await getDocServerOrCache(settingsRef);
     if (snap.exists()) {
       return;
     }
@@ -431,19 +453,42 @@ export async function seedInitialFirestoreIfEmpty(): Promise<void> {
     handleFirestoreError(err, OperationType.GET, 'settings/app');
   }
 
-  // Try importing existing local data from /api/bootstrap if available, else default seed
-  let seed: LabDatabase;
+  // Verify ALL primary collections on server before seeding so existing user data is NEVER overwritten
   try {
-    const res = await fetch('/api/bootstrap');
-    if (res.ok) {
-      seed = (await res.json()) as LabDatabase;
-    } else {
-      seed = buildDefaultSeed();
+    const [stuCheck, subCheck, logCheck, bookCheck, schCheck] = await Promise.all([
+      getDocsServerOrCache(query(collection(db, 'students'), where('visibility', '==', 'school'), limit(1))),
+      getDocsServerOrCache(query(collection(db, 'subjects'), where('visibility', '==', 'school'), limit(1))),
+      getDocsServerOrCache(query(collection(db, 'logs'), where('visibility', '==', 'school'), limit(1))),
+      getDocsServerOrCache(query(collection(db, 'bookings'), where('visibility', '==', 'school'), limit(1))),
+      getDocsServerOrCache(
+        query(collection(db, 'teachingSchedules'), where('visibility', '==', 'school'), limit(1))
+      ),
+    ]);
+
+    const hasExistingUserData =
+      !stuCheck.empty || !subCheck.empty || !logCheck.empty || !bookCheck.empty || !schCheck.empty;
+
+    if (hasExistingUserData) {
+      // Only restore missing settings/app without touching or injecting demo students/subjects/logs
+      await setDoc(settingsRef, {
+        schoolName: DEFAULT_SETTINGS.schoolName,
+        academicYear: DEFAULT_SETTINGS.academicYear,
+        labManager: DEFAULT_SETTINGS.labManager,
+        labManagers: sanitizeLabManagers(DEFAULT_SETTINGS.labManagers, DEFAULT_SETTINGS.labManager),
+        colors: sanitizeThemeColors(DEFAULT_SETTINGS.colors),
+        usageTypes: [...DEFAULT_USAGE_TYPES],
+        scheduleTimes: sanitizeScheduleTimes(undefined),
+        ownerId: uid,
+        visibility: 'school',
+        updatedAt: serverTimestamp(),
+      });
+      return;
     }
-  } catch {
-    seed = buildDefaultSeed();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, 'seed-check');
   }
 
+  const seed = buildDefaultSeed();
   const operations: Array<{ ref: ReturnType<typeof doc>; data: Record<string, unknown> }> = [];
 
   operations.push({
@@ -458,6 +503,7 @@ export async function seedInitialFirestoreIfEmpty(): Promise<void> {
       ),
       colors: sanitizeThemeColors(seed.settings?.colors),
       usageTypes: sanitizeUsageTypes(seed.usageTypes || [...DEFAULT_USAGE_TYPES], LIMITS.USAGE_TYPES_PRESET_MAX),
+      scheduleTimes: sanitizeScheduleTimes(seed.settings?.scheduleTimes),
       ownerId: uid,
       visibility: 'school',
       updatedAt: serverTimestamp(),
@@ -2148,7 +2194,486 @@ export const firestoreApi = {
       handleFirestoreError(err, OperationType.WRITE, 'teachingSchedules');
     }
   },
+
+  exportFullBackup: async (): Promise<FullBackupPayload> => {
+    try {
+      const [settingsSnap, stuSnap, subSnap, logSnap, bookSnap, schSnap] = await Promise.all([
+        getDocServerOrCache(doc(db, 'settings', 'app')),
+        getDocsServerOrCache(query(collection(db, 'students'), where('visibility', '==', 'school'))),
+        getDocsServerOrCache(query(collection(db, 'subjects'), where('visibility', '==', 'school'))),
+        getDocsServerOrCache(query(collection(db, 'logs'), where('visibility', '==', 'school'))),
+        getDocsServerOrCache(query(collection(db, 'bookings'), where('visibility', '==', 'school'))),
+        getDocsServerOrCache(
+          query(collection(db, 'teachingSchedules'), where('visibility', '==', 'school'))
+        ),
+      ]);
+
+      const mappedSettings = settingsSnap.exists()
+        ? mapSettings(settingsSnap.data() as Record<string, unknown>)
+        : { settings: DEFAULT_SETTINGS, usageTypes: [...DEFAULT_USAGE_TYPES] };
+
+      return {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        settings: mappedSettings.settings,
+        usageTypes: mappedSettings.usageTypes,
+        students: stuSnap.docs.map((d) => mapStudent(d.id, d.data() as Record<string, unknown>)),
+        subjects: subSnap.docs.map((d) => mapSubject(d.id, d.data() as Record<string, unknown>)),
+        logs: logSnap.docs.map((d) => mapUsageLog(d.id, d.data() as Record<string, unknown>)),
+        bookings: bookSnap.docs.map((d) => mapBooking(d.id, d.data() as Record<string, unknown>)),
+        teachingSchedules: schSnap.docs.map((d) =>
+          mapTeachingSchedule(d.id, d.data() as Record<string, unknown>)
+        ),
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, 'backup/export');
+    }
+  },
+
+  restoreFullBackup: async (
+    raw: unknown
+  ): Promise<{
+    students: number;
+    subjects: number;
+    logs: number;
+    bookings: number;
+    teachingSchedules: number;
+    settingsUpdated: boolean;
+  }> => {
+    const uid = getActorUid();
+    if (!raw || typeof raw !== 'object') {
+      throw new Error('รูปแบบไฟล์สำรองข้อมูลไม่ถูกต้อง');
+    }
+    const payload = raw as Partial<FullBackupPayload>;
+    const rawStudents = Array.isArray(payload.students) ? payload.students : [];
+    const rawSubjects = Array.isArray(payload.subjects) ? payload.subjects : [];
+    const rawLogs = Array.isArray(payload.logs) ? payload.logs : [];
+    const rawBookings = Array.isArray(payload.bookings) ? payload.bookings : [];
+    const rawSchedules = Array.isArray(payload.teachingSchedules) ? payload.teachingSchedules : [];
+
+    if (
+      rawStudents.length === 0 &&
+      rawSubjects.length === 0 &&
+      rawLogs.length === 0 &&
+      rawBookings.length === 0 &&
+      rawSchedules.length === 0 &&
+      !payload.settings
+    ) {
+      throw new Error('ไม่พบข้อมูลสำหรับกู้คืนในไฟล์สำรองนี้');
+    }
+
+    try {
+      const [settingsSnap, stuSnap, subSnap, logSnap, bookSnap, schSnap] = await Promise.all([
+        getDocServerOrCache(doc(db, 'settings', 'app')),
+        getDocsServerOrCache(query(collection(db, 'students'), where('visibility', '==', 'school'))),
+        getDocsServerOrCache(query(collection(db, 'subjects'), where('visibility', '==', 'school'))),
+        getDocsServerOrCache(query(collection(db, 'logs'), where('visibility', '==', 'school'))),
+        getDocsServerOrCache(query(collection(db, 'bookings'), where('visibility', '==', 'school'))),
+        getDocsServerOrCache(
+          query(collection(db, 'teachingSchedules'), where('visibility', '==', 'school'))
+        ),
+      ]);
+
+      const existingStuIds = new Set(stuSnap.docs.map((d) => d.id));
+      const existingSubIds = new Set(subSnap.docs.map((d) => d.id));
+      const existingLogIds = new Set(logSnap.docs.map((d) => d.id));
+      const existingBookIds = new Set(bookSnap.docs.map((d) => d.id));
+      const existingSchIds = new Set(schSnap.docs.map((d) => d.id));
+
+      type BatchOp =
+        | { type: 'set'; ref: ReturnType<typeof doc>; data: Record<string, unknown> }
+        | { type: 'update'; ref: ReturnType<typeof doc>; data: Record<string, unknown> };
+
+      const phase1Ops: BatchOp[] = [];
+      const phase2BookingFollowups: BatchOp[] = [];
+
+      let settingsUpdated = false;
+      if (payload.settings || Array.isArray(payload.usageTypes)) {
+        const currentMapped = settingsSnap.exists()
+          ? mapSettings(settingsSnap.data() as Record<string, unknown>)
+          : { settings: DEFAULT_SETTINGS, usageTypes: [...DEFAULT_USAGE_TYPES] };
+
+        const incomingSettings = payload.settings || currentMapped.settings;
+        const schoolName =
+          clampString(incomingSettings.schoolName, LIMITS.SCHOOL_NAME_MAX) ||
+          currentMapped.settings.schoolName;
+        const academicYear =
+          clampString(incomingSettings.academicYear, LIMITS.ACADEMIC_YEAR_MAX) ||
+          currentMapped.settings.academicYear;
+        const cleanYear = academicYear.length >= 4 ? academicYear : DEFAULT_SETTINGS.academicYear;
+        const labManager =
+          clampString(incomingSettings.labManager, LIMITS.RECORDER_MAX) ||
+          currentMapped.settings.labManager;
+        const labManagers = sanitizeLabManagers(incomingSettings.labManagers, labManager);
+        const colors = sanitizeThemeColors(incomingSettings.colors || currentMapped.settings.colors);
+        const usageTypes = sanitizeUsageTypes(
+          Array.isArray(payload.usageTypes) ? payload.usageTypes : currentMapped.usageTypes,
+          LIMITS.USAGE_TYPES_PRESET_MAX
+        );
+        const scheduleTimes = sanitizeScheduleTimes(
+          incomingSettings.scheduleTimes || currentMapped.settings.scheduleTimes
+        );
+
+        const settingsRef = doc(db, 'settings', 'app');
+        if (settingsSnap.exists()) {
+          phase1Ops.push({
+            type: 'update',
+            ref: settingsRef,
+            data: {
+              schoolName,
+              academicYear: cleanYear,
+              labManager,
+              labManagers,
+              colors,
+              usageTypes,
+              scheduleTimes,
+              updatedAt: serverTimestamp(),
+            },
+          });
+        } else {
+          phase1Ops.push({
+            type: 'set',
+            ref: settingsRef,
+            data: {
+              schoolName,
+              academicYear: cleanYear,
+              labManager,
+              labManagers,
+              colors,
+              usageTypes,
+              scheduleTimes,
+              ownerId: uid,
+              visibility: 'school',
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+        settingsUpdated = true;
+      }
+
+      let studentsCount = 0;
+      for (const stu of rawStudents) {
+        if (!stu || typeof stu !== 'object') continue;
+        const name = clampString(stu.name, LIMITS.NAME_MAX);
+        if (!name) continue;
+        let className: string;
+        try {
+          className = assertValidClassName(stu.className);
+        } catch {
+          continue;
+        }
+        const id = sanitizeId(stu.id) || generateId('stu');
+        const numberVal =
+          typeof stu.number === 'number' && Number.isInteger(stu.number) && stu.number >= 1
+            ? Math.min(999, stu.number)
+            : null;
+        const ref = doc(db, 'students', id);
+        if (existingStuIds.has(id)) {
+          phase1Ops.push({
+            type: 'update',
+            ref,
+            data: { number: numberVal, name, className, updatedAt: serverTimestamp() },
+          });
+        } else {
+          phase1Ops.push({
+            type: 'set',
+            ref,
+            data: {
+              number: numberVal,
+              name,
+              className,
+              ownerId: uid,
+              visibility: 'school',
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+        studentsCount += 1;
+      }
+
+      let subjectsCount = 0;
+      for (const sub of rawSubjects) {
+        if (!sub || typeof sub !== 'object') continue;
+        const name = clampString(sub.name, LIMITS.NAME_MAX);
+        if (!name) continue;
+        const code = clampString(sub.code, LIMITS.CODE_MAX);
+        const note = clampString(sub.note, LIMITS.SUBJECT_NOTE_MAX);
+        const id = sanitizeId(sub.id) || generateId('sub');
+        const ref = doc(db, 'subjects', id);
+        if (existingSubIds.has(id)) {
+          phase1Ops.push({
+            type: 'update',
+            ref,
+            data: { name, code, note, updatedAt: serverTimestamp() },
+          });
+        } else {
+          phase1Ops.push({
+            type: 'set',
+            ref,
+            data: {
+              name,
+              code,
+              note,
+              ownerId: uid,
+              visibility: 'school',
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+        subjectsCount += 1;
+      }
+
+      let logsCount = 0;
+      for (const log of rawLogs) {
+        if (!log || typeof log !== 'object') continue;
+        let docData: Record<string, unknown>;
+        try {
+          docData = buildUsageLogDoc(
+            {
+              date: log.date,
+              timeIn: log.timeIn,
+              computerRoom: log.computerRoom,
+              computerNumber: log.computerNumber,
+              studentId: log.studentId,
+              studentName: log.studentName,
+              className: log.className,
+              subjectId: log.subjectId,
+              subjectName: log.subjectName,
+              usageTypes: Array.isArray(log.usageTypes) ? log.usageTypes : [],
+              note: log.note,
+              recorder: log.recorder || DEFAULT_SETTINGS.labManager,
+            },
+            uid,
+            false
+          );
+        } catch {
+          continue;
+        }
+        const id = sanitizeId(log.id) || generateId('log');
+        const ref = doc(db, 'logs', id);
+        if (existingLogIds.has(id)) {
+          phase1Ops.push({ type: 'update', ref, data: docData });
+        } else {
+          phase1Ops.push({
+            type: 'set',
+            ref,
+            data: {
+              ...docData,
+              ownerId: uid,
+              visibility: 'school',
+              createdAt: serverTimestamp(),
+            },
+          });
+        }
+        logsCount += 1;
+      }
+
+      let bookingsCount = 0;
+      for (const b of rawBookings) {
+        if (!b || typeof b !== 'object') continue;
+        let date: string;
+        let startTime: string;
+        let endTime: string;
+        try {
+          date = assertValidIsoDate(b.date);
+          const range = assertValidBookingTimeRange(b.startTime, b.endTime);
+          startTime = range.startTime;
+          endTime = range.endTime;
+        } catch {
+          continue;
+        }
+        const bookingMode: BookingMode = b.bookingMode === 'individual' ? 'individual' : 'full_room';
+        const computerRoom = clampString(b.computerRoom, LIMITS.ROOM_MAX);
+        const computerNumber =
+          bookingMode === 'individual' ? clampString(b.computerNumber, LIMITS.STATION_MAX) : '';
+        const requesterName = clampString(b.requesterName, LIMITS.NAME_MAX);
+        const className = clampString(b.className, LIMITS.BOOKING_CLASS_MAX);
+        const subjectName = clampString(b.subjectName, LIMITS.NAME_MAX);
+        if (!computerRoom || !requesterName || className.length < 2 || !subjectName) continue;
+        if (bookingMode === 'individual' && !computerNumber) continue;
+
+        const seatCount =
+          bookingMode === 'individual'
+            ? 1
+            : Math.max(1, Math.min(100, Math.round(Number(b.seatCount) || 30)));
+        const note = clampString(b.note, LIMITS.NOTE_MAX);
+        const status: BookingStatus =
+          b.status === 'approved' || b.status === 'rejected' ? b.status : 'pending';
+        const decisionNote = clampString(b.decisionNote, LIMITS.NOTE_MAX);
+        const decidedBy = clampString(b.decidedBy, LIMITS.RECORDER_MAX);
+
+        const id = sanitizeId(b.id) || generateId('book');
+        const ref = doc(db, 'bookings', id);
+        if (existingBookIds.has(id)) {
+          phase1Ops.push({
+            type: 'update',
+            ref,
+            data: {
+              status,
+              decisionNote,
+              decidedBy,
+              updatedAt: serverTimestamp(),
+            },
+          });
+        } else {
+          // firestore.rules requires bookings create to start as pending with empty decision fields
+          phase1Ops.push({
+            type: 'set',
+            ref,
+            data: {
+              bookingMode,
+              date,
+              startTime,
+              endTime,
+              computerRoom,
+              computerNumber,
+              requesterName,
+              className,
+              subjectName,
+              seatCount,
+              note,
+              status: 'pending',
+              decisionNote: '',
+              decidedBy: '',
+              ownerId: uid,
+              visibility: 'school',
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+          });
+          if (status !== 'pending' || decisionNote || decidedBy) {
+            phase2BookingFollowups.push({
+              type: 'update',
+              ref,
+              data: {
+                status,
+                decisionNote,
+                decidedBy,
+                updatedAt: serverTimestamp(),
+              },
+            });
+          }
+        }
+        bookingsCount += 1;
+      }
+
+      let schedulesCount = 0;
+      for (const s of rawSchedules) {
+        if (!s || typeof s !== 'object') continue;
+        let startTime: string;
+        let endTime: string;
+        try {
+          const range = assertValidBookingTimeRange(s.startTime, s.endTime);
+          startTime = range.startTime;
+          endTime = range.endTime;
+        } catch {
+          continue;
+        }
+        const computerRoom = clampString(s.computerRoom, LIMITS.ROOM_MAX);
+        const dayOfWeek: DayOfWeek =
+          s.dayOfWeek === 'tue' ||
+          s.dayOfWeek === 'wed' ||
+          s.dayOfWeek === 'thu' ||
+          s.dayOfWeek === 'fri'
+            ? s.dayOfWeek
+            : 'mon';
+        const period = Math.max(1, Math.min(8, Math.round(Number(s.period) || 1)));
+        const className = clampString(s.className, LIMITS.BOOKING_CLASS_MAX);
+        const subjectName = clampString(s.subjectName, LIMITS.NAME_MAX);
+        const teacherName = clampString(s.teacherName, LIMITS.NAME_MAX);
+        const note = clampString(s.note, LIMITS.SUBJECT_NOTE_MAX);
+        if (!computerRoom || !className || !subjectName || !teacherName) continue;
+
+        const id = sanitizeId(s.id) || makeScheduleDocId(computerRoom, dayOfWeek, period);
+        const ref = doc(db, 'teachingSchedules', id);
+        if (existingSchIds.has(id)) {
+          phase1Ops.push({
+            type: 'update',
+            ref,
+            data: {
+              computerRoom,
+              dayOfWeek,
+              period,
+              startTime,
+              endTime,
+              className,
+              subjectName,
+              teacherName,
+              note,
+              updatedAt: serverTimestamp(),
+            },
+          });
+        } else {
+          phase1Ops.push({
+            type: 'set',
+            ref,
+            data: {
+              computerRoom,
+              dayOfWeek,
+              period,
+              startTime,
+              endTime,
+              className,
+              subjectName,
+              teacherName,
+              note,
+              ownerId: uid,
+              visibility: 'school',
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+        schedulesCount += 1;
+      }
+
+      const commitOps = async (ops: BatchOp[]) => {
+        const CHUNK = 400;
+        for (let i = 0; i < ops.length; i += CHUNK) {
+          const batch = writeBatch(db);
+          for (const op of ops.slice(i, i + CHUNK)) {
+            if (op.type === 'set') {
+              batch.set(op.ref, op.data);
+            } else {
+              batch.update(op.ref, op.data);
+            }
+          }
+          await batch.commit();
+        }
+      };
+
+      await commitOps(phase1Ops);
+      if (phase2BookingFollowups.length > 0) {
+        await commitOps(phase2BookingFollowups);
+      }
+
+      return {
+        students: studentsCount,
+        subjects: subjectsCount,
+        logs: logsCount,
+        bookings: bookingsCount,
+        teachingSchedules: schedulesCount,
+        settingsUpdated,
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'backup/restore');
+    }
+  },
 };
+
+export interface FullBackupPayload {
+  version: number;
+  exportedAt: string;
+  settings: AppSettings;
+  usageTypes: string[];
+  students: Student[];
+  subjects: Subject[];
+  logs: UsageLog[];
+  bookings: RoomBooking[];
+  teachingSchedules: TeachingScheduleSlot[];
+}
 
 export function subscribeSecurityPins(
   onPins: (hashes: PinHashes) => void,

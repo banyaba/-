@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Save,
   RotateCcw,
@@ -22,6 +22,9 @@ import {
   GraduationCap,
   ArrowRight,
   AlertTriangle,
+  Download,
+  Upload,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   CLASS_LIST,
@@ -46,7 +49,9 @@ import {
   deleteExtraAdminPin,
   updateExtraAdminPin,
   updateSecurityPins,
+  type FullBackupPayload,
 } from '../firebase/firestoreService';
+import { getTodayISO } from '../utils/thaiDate';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -208,6 +213,38 @@ export function SettingsView({
 
   const [clearModal, setClearModal] = useState<'logs' | 'all' | null>(null);
   const [clearing, setClearing] = useState(false);
+
+  // Cloud Backup & Restore State
+  const backupFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [exportingBackup, setExportingBackup] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+  const [pendingBackup, setPendingBackup] = useState<{
+    fileName: string;
+    payload: Partial<FullBackupPayload>;
+    summary: {
+      students: number;
+      subjects: number;
+      logs: number;
+      bookings: number;
+      teachingSchedules: number;
+      hasSettings: boolean;
+    };
+  } | null>(null);
+
+  // Keep form synced when live Firestore settings update (e.g. after restore or multi-tab update)
+  useEffect(() => {
+    setSchoolName(settings.schoolName);
+    setAcademicYear(settings.academicYear);
+    setLabManager(settings.labManager);
+    const list = Array.isArray(settings.labManagers) ? settings.labManagers : [];
+    const seen = new Set<string>();
+    const clean = list.map((m) => m.trim()).filter((m) => m && !seen.has(m) && seen.add(m));
+    if (!seen.has(settings.labManager)) {
+      clean.unshift(settings.labManager);
+    }
+    setLabManagers(clean);
+    setColors(settings.colors);
+  }, [settings]);
 
   const isPrimaryAdmin = !activeAdminId;
   const extraAdmins = pinHashes?.extraAdmins || [];
@@ -412,6 +449,97 @@ export function SettingsView({
       onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถล้างข้อมูลได้');
     } finally {
       setClearing(false);
+    }
+  };
+
+  const handleExportFullBackup = async () => {
+    setExportingBackup(true);
+    try {
+      const backup = await api.exportFullBackup();
+      const jsonStr = JSON.stringify(backup, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `computer-lab-backup-${getTodayISO()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      onNotify(
+        'success',
+        `สำรองข้อมูลเรียบร้อยแล้ว (ประวัติ ${backup.logs.length} · นักเรียน ${backup.students.length} · วิชา ${backup.subjects.length} · จองห้อง ${backup.bookings.length} · ตารางสอน ${backup.teachingSchedules.length})`
+      );
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถส่งออกไฟล์สำรองข้อมูลได้');
+    } finally {
+      setExportingBackup(false);
+    }
+  };
+
+  const handleBackupFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as Partial<FullBackupPayload>;
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('ไฟล์สำรองไม่ถูกต้อง');
+      }
+      const studentsLen = Array.isArray(parsed.students) ? parsed.students.length : 0;
+      const subjectsLen = Array.isArray(parsed.subjects) ? parsed.subjects.length : 0;
+      const logsLen = Array.isArray(parsed.logs) ? parsed.logs.length : 0;
+      const bookingsLen = Array.isArray(parsed.bookings) ? parsed.bookings.length : 0;
+      const schedulesLen = Array.isArray(parsed.teachingSchedules)
+        ? parsed.teachingSchedules.length
+        : 0;
+      const hasSettings = Boolean(parsed.settings || Array.isArray(parsed.usageTypes));
+
+      if (
+        studentsLen === 0 &&
+        subjectsLen === 0 &&
+        logsLen === 0 &&
+        bookingsLen === 0 &&
+        schedulesLen === 0 &&
+        !hasSettings
+      ) {
+        onNotify('error', 'ไม่พบข้อมูลที่กู้คืนได้ในไฟล์สำรองนี้');
+        return;
+      }
+
+      setPendingBackup({
+        fileName: file.name,
+        payload: parsed,
+        summary: {
+          students: studentsLen,
+          subjects: subjectsLen,
+          logs: logsLen,
+          bookings: bookingsLen,
+          teachingSchedules: schedulesLen,
+          hasSettings,
+        },
+      });
+    } catch {
+      onNotify('error', 'ไม่สามารถอ่านไฟล์สำรองได้ กรุณาเลือกไฟล์ .json ที่ส่งออกจากระบบนี้');
+    }
+  };
+
+  const handleConfirmRestoreBackup = async () => {
+    if (!pendingBackup) return;
+    setRestoringBackup(true);
+    try {
+      const res = await api.restoreFullBackup(pendingBackup.payload);
+      setPendingBackup(null);
+      onNotify(
+        'success',
+        `กู้คืนข้อมูลสำเร็จ (ประวัติ ${res.logs} · นักเรียน ${res.students} · วิชา ${res.subjects} · จองห้อง ${res.bookings} · ตารางสอน ${res.teachingSchedules})`
+      );
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถกู้คืนข้อมูลจากไฟล์สำรองได้');
+    } finally {
+      setRestoringBackup(false);
     }
   };
 
@@ -1780,6 +1908,92 @@ export function SettingsView({
       )}
     </section>
 
+    {/* Cloud Persistence & Full Backup / Restore Section */}
+    <section className="rounded-xl border border-emerald-200 dark:border-emerald-900/70 bg-[var(--theme-surface)] overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100/80 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-transparent dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-transparent px-6 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-xs shrink-0">
+            <CheckCircle2 className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              ความปลอดภัยของข้อมูล · สำรองและกู้คืนข้อมูล (Backup &amp; Restore)
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              ข้อมูลทั้งหมดบันทึกถาวรบน Cloud Firestore พร้อมแคชออฟไลน์ในเครื่อง ไม่สูญหายเมื่ออัปเดตหรือรีเฟรชระบบ
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6 space-y-5">
+        <div className="rounded-xl border border-emerald-200/80 dark:border-emerald-800/70 bg-emerald-50/60 dark:bg-emerald-950/25 p-4 text-xs text-emerald-950 dark:text-emerald-200 space-y-1.5 leading-relaxed">
+          <div className="font-semibold flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>ระบบป้องกันข้อมูลหายจากการอัปเดตทำงานอยู่</span>
+          </div>
+          <p className="text-emerald-900/90 dark:text-emerald-300/90">
+            1) ข้อมูลนักเรียน รายวิชา ประวัติการใช้งาน การจอง ตารางสอน และตั้งค่า ถูกเก็บแยกไว้บนฐานข้อมูลคลาวด์ (Cloud Firestore) ไม่ได้เก็บในไฟล์ชั่วคราวของเซิร์ฟเวอร์ &nbsp;·&nbsp;
+            2) เปิดใช้งานแคชออฟไลน์ (IndexedDB Persistence) ช่วยเก็บข้อมูลที่เพิ่งบันทึกไว้ในเบราว์เซอร์และซิงค์ขึ้นคลาวด์อัตโนมัติแม้รีเฟรชหน้าจอ &nbsp;·&nbsp;
+            3) ระบบจะไม่เขียนข้อมูลตัวอย่างทับข้อมูลจริงที่มีอยู่แล้ว
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                สำรองข้อมูลทั้งหมด (Export .json)
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                ดาวน์โหลดข้อมูลทั้งหมดในระบบ (รายชื่อนักเรียน รายวิชา ประวัติการใช้งาน การจองห้อง ตารางคาบสอน และการตั้งค่า) เก็บไว้เป็นไฟล์สำรองในเครื่อง
+              </p>
+            </div>
+            <div>
+              <button
+                type="button"
+                disabled={exportingBackup}
+                onClick={() => void handleExportFullBackup()}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow-xs disabled:opacity-55 transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>{exportingBackup ? 'กำลังส่งออกข้อมูล...' : 'ดาวน์โหลดไฟล์สำรองข้อมูล (.json)'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                กู้คืนข้อมูลจากไฟล์สำรอง (Import .json)
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                นำเข้าข้อมูลจากไฟล์สำรอง .json กลับเข้าสู่ระบบอย่างปลอดภัย (ผสานข้อมูลเดิมโดยไม่ลบข้อมูลที่มีอยู่แล้วในระบบ)
+              </p>
+            </div>
+            <div>
+              <input
+                ref={backupFileInputRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={(e) => void handleBackupFileSelected(e)}
+                className="hidden"
+              />
+              <button
+                type="button"
+                disabled={restoringBackup}
+                onClick={() => backupFileInputRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 disabled:opacity-55 transition-colors"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span>{restoringBackup ? 'กำลังกู้คืนข้อมูล...' : 'เลือกไฟล์สำรองเพื่อกู้คืน (.json)'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     {/* Data Management / Clear Data Section */}
     <section className="rounded-xl border border-rose-200 dark:border-rose-900/70 bg-[var(--theme-surface)] overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rose-100/80 dark:border-rose-900/50 bg-gradient-to-r from-rose-50/90 via-pink-50/60 to-transparent dark:from-rose-950/40 dark:via-pink-950/30 dark:to-transparent px-6 py-4">
@@ -1964,6 +2178,21 @@ export function SettingsView({
       loading={deletingExtra}
       onConfirm={handleConfirmDeleteExtraAdmin}
       onCancel={() => setDeleteExtraTarget(null)}
+    />
+
+    <ConfirmModal
+      open={Boolean(pendingBackup)}
+      title="ยืนยันการกู้คืนข้อมูลจากไฟล์สำรอง"
+      description={
+        pendingBackup
+          ? `พบข้อมูลในไฟล์ "${pendingBackup.fileName}": ประวัติการใช้งาน ${pendingBackup.summary.logs} รายการ · นักเรียน ${pendingBackup.summary.students} คน · รายวิชา ${pendingBackup.summary.subjects} วิชา · จองห้อง ${pendingBackup.summary.bookings} รายการ · ตารางสอน ${pendingBackup.summary.teachingSchedules} คาบ ต้องการนำเข้าและผสานเข้าสู่ฐานข้อมูลหรือไม่? (ข้อมูลเดิมที่ไม่ซ้ำจะไม่ถูกลบ)`
+          : ''
+      }
+      confirmLabel="ยืนยันกู้คืนข้อมูล"
+      danger={false}
+      loading={restoringBackup}
+      onConfirm={handleConfirmRestoreBackup}
+      onCancel={() => setPendingBackup(null)}
     />
 
     <ConfirmModal
