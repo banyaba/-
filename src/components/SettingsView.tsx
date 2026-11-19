@@ -15,6 +15,10 @@ import {
   EyeOff,
   X,
   Lock,
+  Plus,
+  Check,
+  Star,
+  UserCheck,
 } from 'lucide-react';
 import { DEFAULT_THEME_COLORS, type AppSettings, type ThemeColors } from '../types';
 import { api } from '../api/client';
@@ -108,6 +112,23 @@ export function SettingsView({
   const [schoolName, setSchoolName] = useState(settings.schoolName);
   const [academicYear, setAcademicYear] = useState(settings.academicYear);
   const [labManager, setLabManager] = useState(settings.labManager);
+  const [labManagers, setLabManagers] = useState<string[]>(() => {
+    const list = Array.isArray(settings.labManagers) ? settings.labManagers : [];
+    const seen = new Set<string>();
+    const clean = list.map((m) => m.trim()).filter((m) => m && !seen.has(m) && seen.add(m));
+    if (!seen.has(settings.labManager)) {
+      clean.unshift(settings.labManager);
+    }
+    return clean;
+  });
+  const [newManagerName, setNewManagerName] = useState('');
+  const [addingManager, setAddingManager] = useState(false);
+  const [editingManagerIdx, setEditingManagerIdx] = useState<number | null>(null);
+  const [editingManagerValue, setEditingManagerValue] = useState('');
+  const [savingManagerEdit, setSavingManagerEdit] = useState(false);
+  const [confirmDeleteManagerIdx, setConfirmDeleteManagerIdx] = useState<number | null>(null);
+  const [deletingManagerIdx, setDeletingManagerIdx] = useState<number | null>(null);
+  const [settingPrimaryIdx, setSettingPrimaryIdx] = useState<number | null>(null);
   const [colors, setColors] = useState<ThemeColors>(settings.colors);
   const [saving, setSaving] = useState(false);
 
@@ -344,14 +365,142 @@ export function SettingsView({
     }
   };
 
+  const persistManagers = async (
+    nextPrimary: string,
+    nextList: string[],
+    successMsg: string
+  ) => {
+    const res = await api.updateLabManagers(nextPrimary, nextList);
+    setLabManager(res.labManager);
+    setLabManagers(res.labManagers);
+    onSettingsUpdated({
+      ...settings,
+      schoolName: schoolName.trim() || settings.schoolName,
+      academicYear: academicYear.trim() || settings.academicYear,
+      labManager: res.labManager,
+      labManagers: res.labManagers,
+      colors,
+    });
+    onNotify('success', successMsg);
+  };
+
+  const handleAddManager = async () => {
+    const trimmed = newManagerName.trim();
+    if (!trimmed) {
+      onNotify('error', 'กรุณากรอกชื่อผู้รับผิดชอบห้องคอมพิวเตอร์');
+      return;
+    }
+    if (labManagers.includes(trimmed)) {
+      onNotify('error', 'รายชื่อผู้รับผิดชอบนี้มีอยู่ในระบบแล้ว');
+      return;
+    }
+    if (labManagers.length >= 20) {
+      onNotify('error', 'สามารถเพิ่มรายชื่อผู้รับผิดชอบได้สูงสุด 20 คน');
+      return;
+    }
+
+    setAddingManager(true);
+    try {
+      const nextList = [...labManagers, trimmed];
+      await persistManagers(
+        labManager,
+        nextList,
+        `เพิ่มผู้รับผิดชอบห้องคอมพิวเตอร์ "${trimmed}" เรียบร้อยแล้ว`
+      );
+      setNewManagerName('');
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถเพิ่มผู้รับผิดชอบได้');
+    } finally {
+      setAddingManager(false);
+    }
+  };
+
+  const handleSaveEditManager = async (idx: number) => {
+    const trimmed = editingManagerValue.trim();
+    const oldName = labManagers[idx];
+    if (!trimmed) {
+      onNotify('error', 'ชื่อผู้รับผิดชอบห้องคอมพิวเตอร์ห้ามว่าง');
+      return;
+    }
+    if (trimmed === oldName) {
+      setEditingManagerIdx(null);
+      return;
+    }
+    if (labManagers.some((m, i) => i !== idx && m === trimmed)) {
+      onNotify('error', 'รายชื่อผู้รับผิดชอบนี้มีอยู่ในระบบแล้ว');
+      return;
+    }
+
+    setSavingManagerEdit(true);
+    try {
+      const nextList = [...labManagers];
+      nextList[idx] = trimmed;
+      const nextPrimary = labManager === oldName ? trimmed : labManager;
+      await persistManagers(
+        nextPrimary,
+        nextList,
+        `แก้ไขชื่อผู้รับผิดชอบเป็น "${trimmed}" เรียบร้อยแล้ว`
+      );
+      setEditingManagerIdx(null);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถแก้ไขชื่อผู้รับผิดชอบได้');
+    } finally {
+      setSavingManagerEdit(false);
+    }
+  };
+
+  const handleSetPrimaryManager = async (idx: number) => {
+    const targetName = labManagers[idx];
+    if (!targetName || targetName === labManager) return;
+    setSettingPrimaryIdx(idx);
+    try {
+      await persistManagers(
+        targetName,
+        labManagers,
+        `ตั้ง "${targetName}" เป็นผู้รับผิดชอบหลักเรียบร้อยแล้ว`
+      );
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถตั้งผู้รับผิดชอบหลักได้');
+    } finally {
+      setSettingPrimaryIdx(null);
+    }
+  };
+
+  const handleDeleteManager = async (idx: number) => {
+    if (labManagers.length <= 1) {
+      onNotify('error', 'ต้องมีผู้รับผิดชอบห้องคอมพิวเตอร์อย่างน้อย 1 คน');
+      setConfirmDeleteManagerIdx(null);
+      return;
+    }
+    const targetName = labManagers[idx];
+    setDeletingManagerIdx(idx);
+    try {
+      const nextList = labManagers.filter((_, i) => i !== idx);
+      const nextPrimary = labManager === targetName ? nextList[0] : labManager;
+      await persistManagers(
+        nextPrimary,
+        nextList,
+        `ลบรายชื่อผู้รับผิดชอบ "${targetName}" เรียบร้อยแล้ว`
+      );
+      setConfirmDeleteManagerIdx(null);
+      if (editingManagerIdx === idx) setEditingManagerIdx(null);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถลบผู้รับผิดชอบได้');
+    } finally {
+      setDeletingManagerIdx(null);
+    }
+  };
+
   const handleColorChange = (key: keyof ThemeColors, value: string) => {
     const nextColors = { ...colors, [key]: value };
     setColors(nextColors);
     // Live preview immediately
     onSettingsUpdated({
+      ...settings,
       schoolName,
       academicYear,
       labManager,
+      labManagers,
       colors: nextColors,
     });
   };
@@ -359,9 +508,11 @@ export function SettingsView({
   const handleApplyPreset = (presetColors: ThemeColors) => {
     setColors(presetColors);
     onSettingsUpdated({
+      ...settings,
       schoolName,
       academicYear,
       labManager,
+      labManagers,
       colors: presetColors,
     });
   };
@@ -379,8 +530,14 @@ export function SettingsView({
         schoolName: schoolName.trim(),
         academicYear: academicYear.trim(),
         labManager: labManager.trim(),
+        labManagers,
         colors,
+        scheduleTimes: settings.scheduleTimes,
       });
+      setLabManager(updated.labManager);
+      if (updated.labManagers) {
+        setLabManagers(updated.labManagers);
+      }
       onSettingsUpdated(updated);
       onNotify('success', 'บันทึกการตั้งค่าระบบและชุดสีเรียบร้อยแล้ว');
     } catch (err) {
@@ -444,16 +601,195 @@ export function SettingsView({
 
           <div>
             <label htmlFor="set-manager" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              ผู้รับผิดชอบห้องคอมพิวเตอร์
+              ผู้รับผิดชอบห้องคอมพิวเตอร์ (หลัก)
             </label>
-            <input
+            <select
               id="set-manager"
-              type="text"
-              required
               value={labManager}
               onChange={(e) => setLabManager(e.target.value)}
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {labManagers.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Multi-Lab Manager Management Subpanel */}
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                รายชื่อผู้รับผิดชอบห้องคอมพิวเตอร์ ({labManagers.length}/20 คน)
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              เพิ่ม แก้ไข หรือเลือกผู้รับผิดชอบหลักสำหรับแสดงในหัวรายงานและเลือกใช้ในแบบฟอร์ม
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            <input
+              type="text"
+              value={newManagerName}
+              onChange={(e) => setNewManagerName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void handleAddManager();
+                }
+              }}
+              placeholder="เพิ่มชื่อผู้รับผิดชอบห้องคอมพิวเตอร์ เช่น ครูสมหญิง ใจดี"
+              className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <button
+              type="button"
+              disabled={addingManager || !newManagerName.trim() || labManagers.length >= 20}
+              onClick={() => void handleAddManager()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-50 whitespace-nowrap shrink-0"
+              style={{ backgroundColor: 'var(--theme-primary)' }}
+            >
+              <Plus className="h-4 w-4" />
+              <span>{addingManager ? 'กำลังเพิ่ม...' : 'เพิ่มผู้รับผิดชอบ'}</span>
+            </button>
+          </div>
+
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+            {labManagers.map((managerName, idx) => {
+              const isPrimary = managerName === labManager;
+              const isEditing = editingManagerIdx === idx;
+              const isConfirmDelete = confirmDeleteManagerIdx === idx;
+
+              return (
+                <div
+                  key={`${idx}-${managerName}`}
+                  className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-white dark:bg-slate-900 px-4 py-2.5"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="font-mono-num text-xs text-slate-400 w-5 shrink-0">
+                      {idx + 1}.
+                    </span>
+
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editingManagerValue}
+                        onChange={(e) => setEditingManagerValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void handleSaveEditManager(idx);
+                          } else if (e.key === 'Escape') {
+                            setEditingManagerIdx(null);
+                          }
+                        }}
+                        autoFocus
+                        className="flex-1 rounded-md border border-blue-400 bg-white dark:bg-slate-800 px-2.5 py-1 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                          {managerName}
+                        </span>
+                        {isPrimary && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:text-blue-300 shrink-0">
+                            <Star className="h-3 w-3 fill-current" />
+                            <span>ผู้รับผิดชอบหลัก</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveEditManager(idx)}
+                          disabled={savingManagerEdit}
+                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          <span>บันทึก</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingManagerIdx(null)}
+                          disabled={savingManagerEdit}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          <span>ยกเลิก</span>
+                        </button>
+                      </>
+                    ) : isConfirmDelete ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteManager(idx)}
+                          disabled={deletingManagerIdx === idx}
+                          className="rounded-md bg-rose-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                        >
+                          {deletingManagerIdx === idx ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteManagerIdx(null)}
+                          className="rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          ยกเลิก
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {!isPrimary && (
+                          <button
+                            type="button"
+                            onClick={() => void handleSetPrimaryManager(idx)}
+                            disabled={settingPrimaryIdx === idx}
+                            className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:hover:bg-blue-950/40 dark:hover:text-blue-300 transition-colors disabled:opacity-50"
+                          >
+                            {settingPrimaryIdx === idx ? 'กำลังบันทึก...' : 'ตั้งเป็นหลัก'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingManagerIdx(idx);
+                            setEditingManagerValue(managerName);
+                            setConfirmDeleteManagerIdx(null);
+                          }}
+                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-400 transition-colors"
+                          title="แก้ไขชื่อ"
+                          aria-label={`แก้ไข ${managerName}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        {labManagers.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmDeleteManagerIdx(idx);
+                              setEditingManagerIdx(null);
+                            }}
+                            className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 transition-colors"
+                            title="ลบรายชื่อ"
+                            aria-label={`ลบ ${managerName}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
         </div>

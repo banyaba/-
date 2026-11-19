@@ -47,6 +47,7 @@ interface BookingViewProps {
   subjects: Subject[];
   settings: AppSettings;
   defaultManager: string;
+  labManagers?: string[];
   onBookingCreated: (booking: RoomBooking) => void;
   onBookingUpdated: (booking: RoomBooking) => void;
   onBookingDeleted: (bookingId: string) => void;
@@ -72,6 +73,7 @@ export function BookingView({
   subjects,
   settings,
   defaultManager,
+  labManagers,
   onBookingCreated,
   onBookingUpdated,
   onBookingDeleted,
@@ -82,6 +84,18 @@ export function BookingView({
   onOpenAdminLogin,
   onNotify,
 }: BookingViewProps) {
+  const managerOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const candidate of [defaultManager, ...(labManagers || [])]) {
+      const clean = candidate?.trim();
+      if (clean && !seen.has(clean)) {
+        seen.add(clean);
+        list.push(clean);
+      }
+    }
+    return list;
+  }, [defaultManager, labManagers]);
   const [extraTab, setExtraTab] = useState<'none' | 'schedule' | 'report'>('none');
   const effectiveTab: 'individual' | 'full_room' | 'schedule' | 'report' =
     extraTab === 'report'
@@ -1518,11 +1532,35 @@ export function BookingView({
                 <input
                   id="decider-name"
                   type="text"
+                  list="booking-lab-managers"
                   required
                   value={decidedBy}
                   onChange={(e) => setDecidedBy(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+                <datalist id="booking-lab-managers">
+                  {managerOptions.map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+                {managerOptions.length > 1 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {managerOptions.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setDecidedBy(m)}
+                        className={`rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                          decidedBy === m
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

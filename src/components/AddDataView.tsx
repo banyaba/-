@@ -33,6 +33,7 @@ interface AddDataViewProps {
   subjects: Subject[];
   usageTypes: string[];
   defaultRecorder: string;
+  labManagers?: string[];
   editingLog: UsageLog | null;
   onCancelEdit: () => void;
   onLogSaved: (log: UsageLog, isEdit: boolean) => void;
@@ -47,6 +48,7 @@ export function AddDataView({
   subjects,
   usageTypes,
   defaultRecorder,
+  labManagers,
   editingLog,
   onCancelEdit,
   onLogSaved,
@@ -55,6 +57,19 @@ export function AddDataView({
   onNotify,
 }: AddDataViewProps) {
   const [activeTab, setActiveTab] = useState<'individual' | 'batch' | 'external'>('individual');
+
+  const managerOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const candidate of [defaultRecorder, ...(labManagers || [])]) {
+      const clean = candidate?.trim();
+      if (clean && !seen.has(clean)) {
+        seen.add(clean);
+        list.push(clean);
+      }
+    }
+    return list;
+  }, [defaultRecorder, labManagers]);
 
   const studentCountByClass = useMemo(() => {
     const map: Record<string, number> = {};
@@ -776,12 +791,31 @@ export function AddDataView({
               <input
                 id="ind-recorder"
                 type="text"
+                list="add-data-lab-managers"
                 required
                 value={indRecorder}
                 onChange={(e) => setIndRecorder(e.target.value)}
                 placeholder="ชื่อครูผู้สอน"
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              {managerOptions.length > 1 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {managerOptions.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setIndRecorder(m)}
+                      className={`rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                        indRecorder === m
+                          ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1029,12 +1063,31 @@ export function AddDataView({
               <input
                 id="batch-recorder"
                 type="text"
+                list="add-data-lab-managers"
                 required
                 value={batchRecorder}
                 onChange={(e) => setBatchRecorder(e.target.value)}
                 placeholder="ชื่อครูผู้สอน"
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              {managerOptions.length > 1 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {managerOptions.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setBatchRecorder(m)}
+                      className={`rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                        batchRecorder === m
+                          ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1396,13 +1449,37 @@ export function AddDataView({
                 <input
                   id="ext-recorder"
                   type="text"
+                  list="add-data-lab-managers"
                   required
                   value={extRecorder}
                   onChange={(e) => setExtRecorder(e.target.value)}
                   placeholder="ชื่อครูผู้สอนหรือเจ้าหน้าที่ผู้รับผิดชอบ"
                   className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+                {managerOptions.length > 1 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {managerOptions.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setExtRecorder(m)}
+                        className={`rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                          extRecorder === m
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+              <datalist id="add-data-lab-managers">
+                {managerOptions.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
             </div>
 
             {/* Usage Types Checkboxes */}

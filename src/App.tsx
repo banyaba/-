@@ -1014,6 +1014,7 @@ export default function App() {
                   subjects={subjects}
                   usageTypes={usageTypes}
                   defaultRecorder={settings.labManager}
+                  labManagers={settings.labManagers}
                   editingLog={editingLog}
                   onCancelEdit={() => setEditingLog(null)}
                   onLogSaved={(saved, isEdit) => {
@@ -1042,6 +1043,7 @@ export default function App() {
                   subjects={subjects}
                   settings={settings}
                   defaultManager={settings.labManager}
+                  labManagers={settings.labManagers}
                   onBookingCreated={(created) => {
                     setBookings((prev) =>
                       prev.some((b) => b.id === created.id) ? prev : [created, ...prev]

@@ -232,6 +232,10 @@
           "maxLength": 120,
           "description": "Default lab manager name."
         },
+        "labManagers": {
+          "type": "array",
+          "description": "List of configured computer lab managers (1-20 names)."
+        },
         "colors": {
           "type": "object",
           "description": "Recolorable 5-token theme color map."

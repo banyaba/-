@@ -279,16 +279,46 @@ function sanitizeScheduleTimes(raw: unknown): ScheduleTimeSettings {
   };
 }
 
+const MAX_LAB_MANAGERS = 20;
+
+export function sanitizeLabManagers(raw: unknown, primaryManager: string): string[] {
+  const cleanPrimary =
+    clampString(primaryManager, LIMITS.RECORDER_MAX) || DEFAULT_SETTINGS.labManager;
+  const list = Array.isArray(raw) ? raw : [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const item of list) {
+    if (typeof item !== 'string') continue;
+    const trimmed = clampString(item, LIMITS.RECORDER_MAX);
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+    if (result.length >= MAX_LAB_MANAGERS) break;
+  }
+
+  if (!seen.has(cleanPrimary)) {
+    if (result.length >= MAX_LAB_MANAGERS) {
+      result.pop();
+    }
+    result.unshift(cleanPrimary);
+  }
+
+  return result;
+}
+
 function mapSettings(data: Record<string, unknown>): {
   settings: AppSettings;
   usageTypes: string[];
 } {
   const rawColors = (data.colors as Record<string, string> | undefined) || {};
+  const primaryManager = String(data.labManager || DEFAULT_SETTINGS.labManager);
   return {
     settings: {
       schoolName: String(data.schoolName || DEFAULT_SETTINGS.schoolName),
       academicYear: String(data.academicYear || DEFAULT_SETTINGS.academicYear),
-      labManager: String(data.labManager || DEFAULT_SETTINGS.labManager),
+      labManager: primaryManager,
+      labManagers: sanitizeLabManagers(data.labManagers, primaryManager),
       colors: sanitizeThemeColors(rawColors),
       scheduleTimes: sanitizeScheduleTimes(data.scheduleTimes),
     },
@@ -422,6 +452,10 @@ export async function seedInitialFirestoreIfEmpty(): Promise<void> {
       schoolName: clampString(seed.settings?.schoolName || DEFAULT_SETTINGS.schoolName, LIMITS.SCHOOL_NAME_MAX),
       academicYear: clampString(seed.settings?.academicYear || DEFAULT_SETTINGS.academicYear, LIMITS.ACADEMIC_YEAR_MAX),
       labManager: clampString(seed.settings?.labManager || DEFAULT_SETTINGS.labManager, LIMITS.RECORDER_MAX),
+      labManagers: sanitizeLabManagers(
+        seed.settings?.labManagers,
+        seed.settings?.labManager || DEFAULT_SETTINGS.labManager
+      ),
       colors: sanitizeThemeColors(seed.settings?.colors),
       usageTypes: sanitizeUsageTypes(seed.usageTypes || [...DEFAULT_USAGE_TYPES], LIMITS.USAGE_TYPES_PRESET_MAX),
       ownerId: uid,
@@ -1233,15 +1267,21 @@ export const firestoreApi = {
     try {
       const ref = doc(db, 'settings', 'app');
       const snap = await getDoc(ref);
+      const existingData = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
       const existingScheduleTimes = snap.exists()
-        ? sanitizeScheduleTimes(snap.data().scheduleTimes)
+        ? sanitizeScheduleTimes(existingData.scheduleTimes)
         : sanitizeScheduleTimes(payload.scheduleTimes);
+      const nextLabManagers = sanitizeLabManagers(
+        payload.labManagers ?? existingData.labManagers,
+        labManager
+      );
 
       if (snap.exists()) {
         await updateDoc(ref, {
           schoolName,
           academicYear,
           labManager,
+          labManagers: nextLabManagers,
           colors,
           updatedAt: serverTimestamp(),
         });
@@ -1250,6 +1290,7 @@ export const firestoreApi = {
           schoolName,
           academicYear,
           labManager,
+          labManagers: nextLabManagers,
           colors,
           usageTypes: [...DEFAULT_USAGE_TYPES],
           scheduleTimes: existingScheduleTimes,
@@ -1262,8 +1303,66 @@ export const firestoreApi = {
         schoolName,
         academicYear,
         labManager,
+        labManagers: nextLabManagers,
         colors,
         scheduleTimes: existingScheduleTimes,
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    }
+  },
+
+  updateLabManagers: async (
+    primaryManager: string,
+    managers: string[]
+  ): Promise<{ labManager: string; labManagers: string[] }> => {
+    const uid = getActorUid();
+    const seen = new Set<string>();
+    const cleanedList: string[] = [];
+
+    for (const entry of managers) {
+      const trimmed = clampString(entry, LIMITS.RECORDER_MAX);
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      cleanedList.push(trimmed);
+      if (cleanedList.length >= MAX_LAB_MANAGERS) break;
+    }
+
+    if (cleanedList.length === 0) {
+      throw new Error('ต้องมีรายชื่อผู้รับผิดชอบห้องคอมพิวเตอร์อย่างน้อย 1 คน');
+    }
+
+    const cleanPrimary = clampString(primaryManager, LIMITS.RECORDER_MAX);
+    const resolvedPrimary =
+      cleanPrimary && seen.has(cleanPrimary) ? cleanPrimary : cleanedList[0];
+
+    const path = 'settings/app';
+    try {
+      const ref = doc(db, 'settings', 'app');
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        await updateDoc(ref, {
+          labManager: resolvedPrimary,
+          labManagers: cleanedList,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await setDoc(ref, {
+          schoolName: DEFAULT_SETTINGS.schoolName,
+          academicYear: DEFAULT_SETTINGS.academicYear,
+          labManager: resolvedPrimary,
+          labManagers: cleanedList,
+          colors: sanitizeThemeColors(),
+          usageTypes: [...DEFAULT_USAGE_TYPES],
+          scheduleTimes: sanitizeScheduleTimes(undefined),
+          ownerId: uid,
+          visibility: 'school',
+          updatedAt: serverTimestamp(),
+        });
+      }
+      return {
+        labManager: resolvedPrimary,
+        labManagers: cleanedList,
       };
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
@@ -1321,6 +1420,7 @@ export const firestoreApi = {
           schoolName: DEFAULT_SETTINGS.schoolName,
           academicYear: DEFAULT_SETTINGS.academicYear,
           labManager: DEFAULT_SETTINGS.labManager,
+          labManagers: sanitizeLabManagers(undefined, DEFAULT_SETTINGS.labManager),
           colors: sanitizeThemeColors(),
           usageTypes: [...DEFAULT_USAGE_TYPES],
           scheduleTimes: nextScheduleTimes,

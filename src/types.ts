@@ -216,6 +216,7 @@ export interface AppSettings {
   schoolName: string;
   academicYear: string; // Buddhist Era string e.g. '2569'
   labManager: string;
+  labManagers?: string[];
   colors: ThemeColors;
   scheduleTimes?: ScheduleTimeSettings;
 }
@@ -232,6 +233,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   schoolName: 'โรงเรียนสาธิตเทคโนโลยีวิทยา',
   academicYear: '2569',
   labManager: 'ครูธนากร สุขสวัสดิ์',
+  labManagers: ['ครูธนากร สุขสวัสดิ์'],
   colors: DEFAULT_THEME_COLORS,
   scheduleTimes: DEFAULT_SCHEDULE_TIMES,
 };

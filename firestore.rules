@@ -158,12 +158,20 @@ service cloud.firestore {
           'usageTypes', 'ownerId', 'visibility', 'updatedAt'
         ])
         && data.keys().hasOnly([
-          'schoolName', 'academicYear', 'labManager', 'colors',
+          'schoolName', 'academicYear', 'labManager', 'labManagers', 'colors',
           'usageTypes', 'scheduleTimes', 'ownerId', 'visibility', 'updatedAt'
         ])
         && data.schoolName is string && data.schoolName.size() >= 1 && data.schoolName.size() <= 160
         && data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 10
         && data.labManager is string && data.labManager.size() >= 1 && data.labManager.size() <= 120
+        && (!('labManagers' in data) || (
+          data.labManagers is list
+          && data.labManagers.size() >= 1
+          && data.labManagers.size() <= 20
+          && data.labManagers[0] is string
+          && data.labManagers[0].size() >= 1
+          && data.labManagers[0].size() <= 120
+        ))
         && data.colors is map
         && data.colors.keys().hasAll(['primary', 'surface', 'text', 'accent', 'secondary'])
         && data.colors.keys().hasOnly(['primary', 'surface', 'text', 'accent', 'secondary'])
@@ -367,7 +375,7 @@ service cloud.firestore {
         && incoming().ownerId == existing().ownerId
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly([
-          'schoolName', 'academicYear', 'labManager', 'colors', 'usageTypes', 'scheduleTimes', 'updatedAt'
+          'schoolName', 'academicYear', 'labManager', 'labManagers', 'colors', 'usageTypes', 'scheduleTimes', 'updatedAt'
         ]);
       allow delete: if false;
     }
