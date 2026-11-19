@@ -1803,6 +1803,50 @@ export const firestoreApi = {
     }
   },
 
+  clearAllStudents: async (): Promise<{ deletedCount: number }> => {
+    getActorUid();
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'students'), where('visibility', '==', 'school'))
+      );
+      const deletedCount = await deleteDocRefsInChunks(
+        snap.docs.map((d) => d.ref),
+        'students'
+      );
+      return { deletedCount };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'students');
+    }
+  },
+
+  deleteStudentsByClasses: async (
+    classNames: string[]
+  ): Promise<{ deletedCount: number }> => {
+    getActorUid();
+    const safeClasses = Array.from(
+      new Set(classNames.map((cls) => assertValidClassName(cls)))
+    );
+    if (safeClasses.length === 0) {
+      throw new Error('กรุณาเลือกห้องเรียนอย่างน้อย 1 ห้อง');
+    }
+    const targetSet = new Set(safeClasses);
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'students'), where('visibility', '==', 'school'))
+      );
+      const refs = snap.docs
+        .filter((d) => {
+          const cls = String((d.data() as Record<string, unknown>).className ?? '');
+          return targetSet.has(cls);
+        })
+        .map((d) => d.ref);
+      const deletedCount = await deleteDocRefsInChunks(refs, 'students');
+      return { deletedCount };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'students');
+    }
+  },
+
   // Room Bookings (Anyone can book; only Admin can approve/reject/delete)
   createBooking: async (payload: {
     bookingMode: BookingMode;

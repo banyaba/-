@@ -211,7 +211,8 @@ export function SettingsView({
   const [showOwnPin, setShowOwnPin] = useState(false);
   const [savingOwnPin, setSavingOwnPin] = useState(false);
 
-  const [clearModal, setClearModal] = useState<'logs' | 'all' | null>(null);
+  const [clearModal, setClearModal] = useState<'logs' | 'students-all' | 'students-rooms' | 'all' | null>(null);
+  const [selectedClearRooms, setSelectedClearRooms] = useState<string[]>([]);
   const [clearing, setClearing] = useState(false);
 
   // Cloud Backup & Restore State
@@ -245,6 +246,28 @@ export function SettingsView({
     setLabManagers(clean);
     setColors(settings.colors);
   }, [settings]);
+
+  // Prune selected rooms for clearing if those rooms no longer have students
+  useEffect(() => {
+    setSelectedClearRooms((prev) =>
+      prev.filter((cls) => (studentCountByClass[cls] || 0) > 0)
+    );
+  }, [studentCountByClass]);
+
+  const roomsWithStudents = useMemo(
+    () => CLASS_LIST.filter((cls) => (studentCountByClass[cls] || 0) > 0),
+    [studentCountByClass]
+  );
+
+  const orderedSelectedClearRooms = useMemo(
+    () => CLASS_LIST.filter((cls) => selectedClearRooms.includes(cls)),
+    [selectedClearRooms]
+  );
+
+  const selectedClearStudentCount = useMemo(
+    () => orderedSelectedClearRooms.reduce((sum, cls) => sum + (studentCountByClass[cls] || 0), 0),
+    [orderedSelectedClearRooms, studentCountByClass]
+  );
 
   const isPrimaryAdmin = !activeAdminId;
   const extraAdmins = pinHashes?.extraAdmins || [];
@@ -436,9 +459,25 @@ export function SettingsView({
         const res = await api.clearUsageLogsOnly();
         onClearLogsOnly();
         onNotify('success', `ลบข้อมูลเฉพาะการใช้งาน (${res.deletedCount} รายการ) เรียบร้อยแล้ว`);
+      } else if (clearModal === 'students-all') {
+        const res = await api.clearAllStudents();
+        onStudentsChanged([]);
+        setSelectedClearRooms([]);
+        onNotify('success', `ลบรายชื่อนักเรียนทั้งหมด (${res.deletedCount} คน) เรียบร้อยแล้ว`);
+      } else if (clearModal === 'students-rooms') {
+        const targetRooms = [...orderedSelectedClearRooms];
+        const res = await api.deleteStudentsByClasses(targetRooms);
+        const targetSet = new Set(targetRooms);
+        onStudentsChanged(students.filter((stu) => !targetSet.has(stu.className)));
+        setSelectedClearRooms([]);
+        onNotify(
+          'success',
+          `ลบรายชื่อนักเรียนห้อง ${targetRooms.join(', ')} (${res.deletedCount} คน) เรียบร้อยแล้ว`
+        );
       } else {
         const res = await api.clearAllData();
         onClearAllData();
+        setSelectedClearRooms([]);
         onNotify(
           'success',
           `ล้างข้อมูลทั้งหมดเรียบร้อยแล้ว (การใช้งาน ${res.deletedLogs}, นักเรียน ${res.deletedStudents}, รายวิชา ${res.deletedSubjects})`
@@ -2016,7 +2055,7 @@ export function SettingsView({
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-6 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Option 1: Delete usage logs only */}
         <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
@@ -2041,7 +2080,121 @@ export function SettingsView({
           </div>
         </div>
 
-        {/* Option 2: Clear all data */}
+        {/* Option 2: Delete ALL students */}
+        <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              ลบรายชื่อนักเรียนทั้งหมด
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              ลบรายชื่อนักเรียนทั้งหมดออกจากระบบ (<span className="font-mono-num font-medium text-slate-700 dark:text-slate-300">{counts.students}</span> คน) เพื่อนำเข้ารายชื่อชุดใหม่ โดยยังคงประวัติการใช้งาน รายวิชา และตารางสอนไว้ครบถ้วน
+            </p>
+          </div>
+          <div>
+            <button
+              type="button"
+              disabled={counts.students === 0}
+              onClick={() => setClearModal('students-all')}
+              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/50 px-4 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 disabled:opacity-50 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>ลบรายชื่อนักเรียนทั้งหมด ({counts.students})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Option 3: Delete students by selected classrooms */}
+        <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  ลบรายชื่อนักเรียน (เลือกห้อง)
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  เลือกห้องเรียนที่ต้องการลบรายชื่อนักเรียนออก (เลือกได้ 1 ห้องหรือหลายห้อง)
+                </p>
+              </div>
+              {roomsWithStudents.length > 0 && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedClearRooms([...roomsWithStudents])}
+                    className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                  >
+                    เลือกทุกห้องที่มีชื่อ
+                  </button>
+                  {selectedClearRooms.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedClearRooms([])}
+                      className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                    >
+                      ล้างที่เลือก
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {counts.students === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30 px-3 py-4 text-center text-xs text-slate-400 dark:text-slate-500">
+                ไม่มีรายชื่อนักเรียนในระบบ
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-1.5">
+                {CLASS_LIST.map((cls) => {
+                  const count = studentCountByClass[cls] || 0;
+                  const isSelected = selectedClearRooms.includes(cls);
+                  const disabled = count === 0;
+                  return (
+                    <button
+                      key={cls}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => {
+                        setSelectedClearRooms((prev) =>
+                          prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls]
+                        );
+                      }}
+                      className={`flex items-center justify-between gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+                        disabled
+                          ? 'border-slate-100 dark:border-slate-800/70 bg-slate-50/50 dark:bg-slate-900/40 text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                          : isSelected
+                          ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-200 font-semibold'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:border-rose-300 hover:bg-rose-50/40 dark:hover:bg-rose-950/20'
+                      }`}
+                    >
+                      <span className="truncate">{cls}</span>
+                      <span className="font-mono-num text-[11px] shrink-0 opacity-80">
+                        ({count})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              {selectedClearRooms.length > 0
+                ? `เลือก ${selectedClearRooms.length} ห้อง · ${selectedClearStudentCount} คน`
+                : 'คลิกเลือกห้องเรียนด้านบน'}
+            </span>
+            <button
+              type="button"
+              disabled={selectedClearRooms.length === 0 || selectedClearStudentCount === 0}
+              onClick={() => setClearModal('students-rooms')}
+              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/50 px-4 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 disabled:opacity-50 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>ลบนักเรียนห้องที่เลือก ({selectedClearStudentCount})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Option 4: Clear all data */}
         <div className="flex flex-col justify-between gap-4 rounded-xl border border-rose-200 dark:border-rose-900/70 bg-rose-50/30 dark:bg-rose-950/20 p-4">
           <div>
             <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300">
@@ -2197,13 +2350,33 @@ export function SettingsView({
 
     <ConfirmModal
       open={clearModal !== null}
-      title={clearModal === 'logs' ? 'ยืนยันการลบข้อมูลเฉพาะการใช้งาน' : 'ยืนยันการล้างข้อมูลทั้งหมด'}
+      title={
+        clearModal === 'logs'
+          ? 'ยืนยันการลบข้อมูลเฉพาะการใช้งาน'
+          : clearModal === 'students-all'
+          ? 'ยืนยันการลบรายชื่อนักเรียนทั้งหมด'
+          : clearModal === 'students-rooms'
+          ? 'ยืนยันการลบรายชื่อนักเรียนตามห้องที่เลือก'
+          : 'ยืนยันการล้างข้อมูลทั้งหมด'
+      }
       description={
         clearModal === 'logs'
           ? `ต้องการลบประวัติการเข้าใช้ห้องคอมพิวเตอร์ทั้งหมด ${counts.logs} รายการหรือไม่? (รายชื่อนักเรียน รายวิชา และการตั้งค่าจะไม่ถูกลบ) การดำเนินการนี้ไม่สามารถย้อนกลับได้`
+          : clearModal === 'students-all'
+          ? `ต้องการลบรายชื่อนักเรียนทั้งหมด ${counts.students} คน ออกจากระบบหรือไม่? (ประวัติการใช้งาน รายวิชา ตารางสอน และการตั้งค่าจะไม่ถูกลบ) การดำเนินการนี้ไม่สามารถย้อนกลับได้`
+          : clearModal === 'students-rooms'
+          ? `ต้องการลบรายชื่อนักเรียนในห้อง ${orderedSelectedClearRooms.join(', ')} จำนวน ${selectedClearStudentCount} คน ออกจากระบบหรือไม่? (ห้องเรียนอื่นและประวัติการใช้งานเดิมจะไม่ถูกลบ) การดำเนินการนี้ไม่สามารถย้อนกลับได้`
           : `ต้องการล้างข้อมูลทั้งหมดในระบบ (การใช้งาน ${counts.logs} รายการ, นักเรียน ${counts.students} คน, รายวิชา ${counts.subjects} วิชา) หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้`
       }
-      confirmLabel={clearModal === 'logs' ? 'ยืนยันลบข้อมูลการใช้งาน' : 'ยืนยันล้างข้อมูลทั้งหมด'}
+      confirmLabel={
+        clearModal === 'logs'
+          ? 'ยืนยันลบข้อมูลการใช้งาน'
+          : clearModal === 'students-all'
+          ? 'ยืนยันลบนักเรียนทั้งหมด'
+          : clearModal === 'students-rooms'
+          ? 'ยืนยันลบนักเรียนห้องที่เลือก'
+          : 'ยืนยันล้างข้อมูลทั้งหมด'
+      }
       loading={clearing}
       onConfirm={handleConfirmClear}
       onCancel={() => setClearModal(null)}
