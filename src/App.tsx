@@ -21,12 +21,15 @@ import {
   Lock,
   UserCheck,
   PieChart,
+  CalendarClock,
 } from 'lucide-react';
 import {
   DEFAULT_SETTINGS,
   DEFAULT_USAGE_TYPES,
   type AppSettings,
+  type BookingMode,
   type PageId,
+  type RoomBooking,
   type Student,
   type Subject,
   type UsageLog,
@@ -49,6 +52,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { PinCodeInput } from './components/PinCodeInput';
 import { DashboardView } from './components/DashboardView';
 import { AddDataView } from './components/AddDataView';
+import { BookingView } from './components/BookingView';
 import { DataTableView } from './components/DataTableView';
 import { StatisticsView } from './components/StatisticsView';
 import { StudentsView } from './components/StudentsView';
@@ -77,6 +81,14 @@ const NAV_ITEMS: NavItem[] = [
     headerTint: 'from-blue-600 to-indigo-600',
   },
   {
+    id: 'bookings',
+    label: 'จองห้องคอม',
+    icon: CalendarClock,
+    iconClass: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-400',
+    activeGradient: 'linear-gradient(135deg, #10b981, #059669)',
+    headerTint: 'from-emerald-600 to-teal-600',
+  },
+  {
     id: 'dashboard',
     label: 'หน้าหลัก',
     icon: LayoutDashboard,
@@ -86,7 +98,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'data-table',
-    label: 'ตารางข้อมูล',
+    label: 'ประวัติการใช้',
     icon: Table2,
     iconClass: 'bg-teal-50 text-teal-600 dark:bg-teal-950/70 dark:text-teal-400',
     activeGradient: 'linear-gradient(135deg, #0d9488, #059669)',
@@ -180,6 +192,7 @@ export default function App() {
   });
 
   const [activePage, setActivePage] = useState<PageId>('add-data');
+  const [bookingMode, setBookingMode] = useState<BookingMode>('individual');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -188,6 +201,7 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [logs, setLogs] = useState<UsageLog[]>([]);
+  const [bookings, setBookings] = useState<RoomBooking[]>([]);
   const [usageTypes, setUsageTypes] = useState<string[]>([...DEFAULT_USAGE_TYPES]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
@@ -329,6 +343,10 @@ export default function App() {
             loadedLogs = true;
             maybeFinishLoading();
           },
+          onBookings: (nextBookings) => {
+            if (!active) return;
+            setBookings(nextBookings);
+          },
           onError: (err) => {
             if (!active) return;
             setLoadError(formatErrorForDisplay(err.message));
@@ -358,6 +376,11 @@ export default function App() {
     if (role === 'admin') return NAV_ITEMS;
     return NAV_ITEMS.filter((item) => !item.adminOnly);
   }, [role]);
+
+  const pendingBookingCount = useMemo(
+    () => bookings.filter((b) => b.status === 'pending').length,
+    [bookings]
+  );
 
   // Guard admin-only routes if role is 'user'
   useEffect(() => {
@@ -706,26 +729,36 @@ export default function App() {
               const Icon = item.icon;
               const isActive = activePage === item.id;
               return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleNavigate(item.id)}
-                  className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
-                    isActive
-                      ? 'text-white shadow-sm'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  style={isActive ? { background: item.activeGradient } : undefined}
-                >
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                      isActive ? 'bg-white/20 text-white' : item.iconClass
+                <div key={item.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate(item.id)}
+                    className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
+                      isActive
+                        ? 'text-white shadow-sm'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white'
                     }`}
+                    style={isActive ? { background: item.activeGradient } : undefined}
                   >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="truncate">{item.label}</span>
-                </button>
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                        isActive ? 'bg-white/20 text-white' : item.iconClass
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="truncate flex-1 text-left">{item.label}</span>
+                    {item.id === 'bookings' && role === 'admin' && pendingBookingCount > 0 && (
+                      <span
+                        className={`font-mono-num text-[11px] font-bold shrink-0 ${
+                          isActive ? 'text-white/95' : 'text-amber-600 dark:text-amber-400'
+                        }`}
+                      >
+                        {pendingBookingCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
               );
             })}
           </nav>
@@ -932,6 +965,31 @@ export default function App() {
                     setLogs((prev) => [...createdItems, ...prev]);
                   }}
                   onUsageTypesChanged={setUsageTypes}
+                  onNotify={notify}
+                />
+              )}
+
+              {activePage === 'bookings' && (
+                <BookingView
+                  role={role}
+                  activeMode={bookingMode}
+                  onModeChange={setBookingMode}
+                  bookings={bookings}
+                  subjects={subjects}
+                  settings={settings}
+                  defaultManager={settings.labManager}
+                  onBookingCreated={(created) => {
+                    setBookings((prev) =>
+                      prev.some((b) => b.id === created.id) ? prev : [created, ...prev]
+                    );
+                  }}
+                  onBookingUpdated={(updated) => {
+                    setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+                  }}
+                  onBookingDeleted={(id) => {
+                    setBookings((prev) => prev.filter((b) => b.id !== id));
+                  }}
+                  onOpenAdminLogin={() => setAdminModalOpen(true)}
                   onNotify={notify}
                 />
               )}

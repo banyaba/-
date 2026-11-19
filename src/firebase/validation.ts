@@ -1,4 +1,4 @@
-import { CLASS_LIST, DEFAULT_THEME_COLORS, type ThemeColors } from '../types';
+import { CLASS_LIST, DEFAULT_THEME_COLORS, EXTERNAL_VISITOR_CLASS, type ThemeColors } from '../types';
 
 export const LIMITS = {
   NAME_MAX: 120,
@@ -16,12 +16,14 @@ export const LIMITS = {
   USAGE_TYPES_LOG_MAX: 30,
   USAGE_TYPES_PRESET_MAX: 50,
   USAGE_TYPE_ITEM_MAX: 100,
+  BOOKING_CLASS_MAX: 40,
 } as const;
 
 export const PATTERNS = {
   ID: /^[a-zA-Z0-9_\-]+$/,
   CLASS_NAME: /^ป\.[1-6]\/[1-3]$/,
   ISO_DATE: /^\d{4}-\d{2}-\d{2}$/,
+  TIME_HHMM: /^([01]\d|2[0-3]):[0-5]\d$/,
   HEX_COLOR: /^#[0-9a-fA-F]{6}$/,
 } as const;
 
@@ -42,12 +44,40 @@ export function assertValidClassName(className: string): string {
   return trimmed;
 }
 
+export function assertValidLogClassName(className: string): string {
+  const trimmed = clampString(className, LIMITS.CLASS_MAX);
+  if (trimmed === EXTERNAL_VISITOR_CLASS) {
+    return trimmed;
+  }
+  return assertValidClassName(trimmed);
+}
+
 export function assertValidIsoDate(date: string): string {
   const trimmed = clampString(date, 10);
   if (!PATTERNS.ISO_DATE.test(trimmed)) {
     throw new Error('รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)');
   }
   return trimmed;
+}
+
+export function assertValidTimeHHMM(time: string, label = 'เวลา'): string {
+  const trimmed = clampString(time, 5);
+  if (!PATTERNS.TIME_HHMM.test(trimmed)) {
+    throw new Error(`${label}ไม่ถูกต้อง (ต้องเป็นรูปแบบ HH:mm)`);
+  }
+  return trimmed;
+}
+
+export function assertValidBookingTimeRange(startTime: string, endTime: string): {
+  startTime: string;
+  endTime: string;
+} {
+  const start = assertValidTimeHHMM(startTime, 'เวลาเริ่ม');
+  const end = assertValidTimeHHMM(endTime, 'เวลาสิ้นสุด');
+  if (end <= start) {
+    throw new Error('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม');
+  }
+  return { startTime: start, endTime: end };
 }
 
 export function sanitizeUsageTypes(list: string[] | undefined, maxItems: number): string[] {

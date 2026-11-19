@@ -19,16 +19,22 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_USAGE_TYPES,
   type AppSettings,
+  type BookingMode,
+  type BookingStatus,
   type LabDatabase,
+  type RoomBooking,
   type Student,
   type Subject,
   type UsageLog,
+  type UserRole,
 } from '../types';
 import { auth, BOOTSTRAPPED_ADMIN_EMAIL, db } from './config';
 import { handleFirestoreError, OperationType } from './errors';
 import {
+  assertValidBookingTimeRange,
   assertValidClassName,
   assertValidIsoDate,
+  assertValidLogClassName,
   clampString,
   LIMITS,
   sanitizeId,
@@ -129,6 +135,58 @@ function mapUsageLog(id: string, data: Record<string, unknown>): UsageLog {
     recorder: String(data.recorder ?? ''),
     createdAt: toIsoString(data.createdAt),
   };
+}
+
+function mapBooking(id: string, data: Record<string, unknown>): RoomBooking {
+  const rawStatus = String(data.status ?? 'pending');
+  const status: BookingStatus =
+    rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+  const rawMode = String(data.bookingMode ?? 'full_room');
+  const bookingMode: BookingMode = rawMode === 'individual' ? 'individual' : 'full_room';
+  return {
+    id,
+    bookingMode,
+    date: String(data.date ?? ''),
+    startTime: String(data.startTime ?? ''),
+    endTime: String(data.endTime ?? ''),
+    computerRoom: String(data.computerRoom ?? ''),
+    computerNumber: data.computerNumber ? String(data.computerNumber) : '',
+    requesterName: String(data.requesterName ?? ''),
+    className: String(data.className ?? ''),
+    subjectName: String(data.subjectName ?? ''),
+    seatCount: typeof data.seatCount === 'number' ? data.seatCount : Number(data.seatCount || 30),
+    note: data.note ? String(data.note) : '',
+    status,
+    decisionNote: data.decisionNote ? String(data.decisionNote) : '',
+    decidedBy: data.decidedBy ? String(data.decidedBy) : '',
+    createdAt: toIsoString(data.createdAt),
+    updatedAt: toIsoString(data.updatedAt ?? data.createdAt),
+  };
+}
+
+function findApprovedBookingConflict(
+  candidate: {
+    id?: string;
+    bookingMode: BookingMode;
+    date: string;
+    startTime: string;
+    endTime: string;
+    computerRoom: string;
+    computerNumber?: string;
+  },
+  existingList: RoomBooking[]
+): RoomBooking | undefined {
+  return existingList.find((b) => {
+    if (candidate.id && b.id === candidate.id) return false;
+    if (b.status !== 'approved') return false;
+    if (b.date !== candidate.date || b.computerRoom !== candidate.computerRoom) return false;
+    const overlaps = candidate.startTime < b.endTime && candidate.endTime > b.startTime;
+    if (!overlaps) return false;
+    if (candidate.bookingMode === 'full_room' || b.bookingMode === 'full_room') {
+      return true;
+    }
+    return (b.computerNumber || '') === (candidate.computerNumber || '');
+  });
 }
 
 function mapSettings(data: Record<string, unknown>): {
@@ -324,7 +382,7 @@ export async function seedInitialFirestoreIfEmpty(): Promise<void> {
         computerNumber: clampString(log.computerNumber, LIMITS.STATION_MAX),
         studentId: sanitizeId(log.studentId),
         studentName: clampString(log.studentName, LIMITS.NAME_MAX) || 'นักเรียน',
-        className: assertValidClassName(log.className),
+        className: assertValidLogClassName(log.className),
         subjectId: sanitizeId(log.subjectId),
         subjectName: clampString(log.subjectName, LIMITS.NAME_MAX) || 'รายวิชา',
         usageTypes: sanitizeUsageTypes(log.usageTypes, LIMITS.USAGE_TYPES_LOG_MAX),
@@ -356,6 +414,7 @@ export interface LabSubscriptionsCallbacks {
   onStudents: (students: Student[]) => void;
   onSubjects: (subjects: Subject[]) => void;
   onLogs: (logs: UsageLog[]) => void;
+  onBookings?: (bookings: RoomBooking[]) => void;
   onSettings: (settings: AppSettings, usageTypes: string[]) => void;
   onError: (err: Error) => void;
 }
@@ -431,11 +490,35 @@ export function subscribeLabDatabase(callbacks: LabSubscriptionsCallbacks): Unsu
     }
   );
 
+  const unsubBookings = callbacks.onBookings
+    ? onSnapshot(
+        query(collection(db, 'bookings'), where('visibility', '==', 'school')),
+        (snap) => {
+          const items = snap.docs
+            .map((d) => mapBooking(d.id, d.data() as Record<string, unknown>))
+            .sort((a, b) => {
+              const dateDiff = b.date.localeCompare(a.date);
+              if (dateDiff !== 0) return dateDiff;
+              return a.startTime.localeCompare(b.startTime);
+            });
+          callbacks.onBookings?.(items);
+        },
+        (err) => {
+          try {
+            handleFirestoreError(err, OperationType.LIST, 'bookings');
+          } catch (wrapped) {
+            callbacks.onError(wrapped as Error);
+          }
+        }
+      )
+    : () => {};
+
   return () => {
     unsubSettings();
     unsubStudents();
     unsubSubjects();
     unsubLogs();
+    unsubBookings();
   };
 }
 
@@ -457,7 +540,7 @@ function buildUsageLogDoc(
     computerNumber: clampString(payload.computerNumber, LIMITS.STATION_MAX),
     studentId: sanitizeId(payload.studentId),
     studentName,
-    className: assertValidClassName(payload.className),
+    className: assertValidLogClassName(payload.className),
     subjectId: sanitizeId(payload.subjectId),
     subjectName,
     usageTypes: sanitizeUsageTypes(payload.usageTypes, LIMITS.USAGE_TYPES_LOG_MAX),
@@ -1099,6 +1182,211 @@ export const firestoreApi = {
       return { deletedLogs, deletedStudents, deletedSubjects };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, 'data/all');
+    }
+  },
+
+  // Room Bookings (Anyone can book; only Admin can approve/reject/delete)
+  createBooking: async (payload: {
+    bookingMode: BookingMode;
+    date: string;
+    startTime: string;
+    endTime: string;
+    computerRoom: string;
+    computerNumber?: string;
+    requesterName: string;
+    className: string;
+    subjectName: string;
+    seatCount: number;
+    note?: string;
+  }): Promise<RoomBooking> => {
+    const uid = getActorUid();
+    const bookingMode: BookingMode =
+      payload.bookingMode === 'individual' ? 'individual' : 'full_room';
+    const date = assertValidIsoDate(payload.date);
+    const { startTime, endTime } = assertValidBookingTimeRange(payload.startTime, payload.endTime);
+    const computerRoom = clampString(payload.computerRoom, LIMITS.ROOM_MAX);
+    const computerNumber =
+      bookingMode === 'individual'
+        ? clampString(payload.computerNumber, LIMITS.STATION_MAX)
+        : '';
+    const requesterName = clampString(payload.requesterName, LIMITS.NAME_MAX);
+    const className = clampString(payload.className, LIMITS.BOOKING_CLASS_MAX);
+    const subjectName = clampString(payload.subjectName, LIMITS.NAME_MAX);
+    const note = clampString(payload.note, LIMITS.NOTE_MAX);
+    const seatCount =
+      bookingMode === 'individual'
+        ? 1
+        : Math.max(1, Math.min(100, Math.round(Number(payload.seatCount) || 30)));
+
+    if (!computerRoom || !requesterName || className.length < 2 || !subjectName) {
+      throw new Error('กรุณากรอกข้อมูลการจองให้ครบถ้วน');
+    }
+    if (bookingMode === 'individual' && !computerNumber) {
+      throw new Error('กรุณาเลือกหมายเลขเครื่องที่ต้องการจอง');
+    }
+
+    try {
+      const existingSnap = await getDocs(
+        query(collection(db, 'bookings'), where('visibility', '==', 'school'))
+      );
+      const existingBookings = existingSnap.docs.map((d) =>
+        mapBooking(d.id, d.data() as Record<string, unknown>)
+      );
+      const conflict = findApprovedBookingConflict(
+        {
+          bookingMode,
+          date,
+          startTime,
+          endTime,
+          computerRoom,
+          computerNumber,
+        },
+        existingBookings
+      );
+      if (conflict) {
+        const conflictTarget =
+          conflict.bookingMode === 'full_room'
+            ? 'จองเครื่องทั้งห้อง'
+            : `เครื่องที่ ${conflict.computerNumber || '-'}`;
+        throw new Error(
+          `ห้อง ${computerRoom} (${conflictTarget}) เวลา ${conflict.startTime}–${conflict.endTime} น. ได้รับอนุญาตให้ "${conflict.requesterName}" จองไว้แล้ว`
+        );
+      }
+
+      const id = generateId('book');
+      const nowIso = new Date().toISOString();
+      await setDoc(doc(db, 'bookings', id), {
+        bookingMode,
+        date,
+        startTime,
+        endTime,
+        computerRoom,
+        computerNumber,
+        requesterName,
+        className,
+        subjectName,
+        seatCount,
+        note,
+        status: 'pending',
+        decisionNote: '',
+        decidedBy: '',
+        ownerId: uid,
+        visibility: 'school',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      return {
+        id,
+        bookingMode,
+        date,
+        startTime,
+        endTime,
+        computerRoom,
+        computerNumber,
+        requesterName,
+        className,
+        subjectName,
+        seatCount,
+        note,
+        status: 'pending',
+        decisionNote: '',
+        decidedBy: '',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('ได้รับอนุญาตให้')) {
+        throw err;
+      }
+      handleFirestoreError(err, OperationType.CREATE, 'bookings');
+    }
+  },
+
+  decideBooking: async (
+    id: string,
+    decision: {
+      status: 'approved' | 'rejected';
+      decisionNote?: string;
+      decidedBy: string;
+      role: UserRole;
+    }
+  ): Promise<RoomBooking> => {
+    getActorUid();
+    if (decision.role !== 'admin') {
+      throw new Error('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์อนุญาตหรือไม่อนุญาตการจอง');
+    }
+    const safeId = sanitizeId(id);
+    if (!safeId) throw new Error('รหัสการจองไม่ถูกต้อง');
+
+    const decidedBy = clampString(decision.decidedBy, LIMITS.RECORDER_MAX) || 'ผู้ดูแลระบบ';
+    const decisionNote = clampString(decision.decisionNote, LIMITS.NOTE_MAX);
+    const path = `bookings/${safeId}`;
+
+    try {
+      const ref = doc(db, 'bookings', safeId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        throw new Error('ไม่พบรายการจองที่ต้องการพิจารณา');
+      }
+      const existingBooking = mapBooking(snap.id, snap.data() as Record<string, unknown>);
+
+      if (decision.status === 'approved') {
+        const allSnap = await getDocs(
+          query(collection(db, 'bookings'), where('visibility', '==', 'school'))
+        );
+        const allBookings = allSnap.docs.map((d) =>
+          mapBooking(d.id, d.data() as Record<string, unknown>)
+        );
+        const conflict = findApprovedBookingConflict(existingBooking, allBookings);
+        if (conflict) {
+          const conflictTarget =
+            conflict.bookingMode === 'full_room'
+              ? 'จองเครื่องทั้งห้อง'
+              : `เครื่องที่ ${conflict.computerNumber || '-'}`;
+          throw new Error(
+            `ไม่สามารถอนุญาตซ้อนได้: ห้อง ${conflict.computerRoom} (${conflictTarget}) เวลา ${conflict.startTime}–${conflict.endTime} น. อนุญาตให้ "${conflict.requesterName}" ไปแล้ว`
+          );
+        }
+      }
+
+      await updateDoc(ref, {
+        status: decision.status,
+        decisionNote,
+        decidedBy,
+        updatedAt: serverTimestamp(),
+      });
+
+      return {
+        ...existingBooking,
+        status: decision.status,
+        decisionNote,
+        decidedBy,
+        updatedAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.message.includes('ไม่สามารถอนุญาตซ้อนได้') || err.message.includes('ไม่พบรายการจอง'))
+      ) {
+        throw err;
+      }
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    }
+  },
+
+  deleteBooking: async (id: string, role: UserRole): Promise<{ ok: boolean }> => {
+    getActorUid();
+    if (role !== 'admin') {
+      throw new Error('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์ลบรายการจอง');
+    }
+    const safeId = sanitizeId(id);
+    if (!safeId) throw new Error('รหัสการจองไม่ถูกต้อง');
+    try {
+      await deleteDoc(doc(db, 'bookings', safeId));
+      return { ok: true };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `bookings/${safeId}`);
     }
   },
 };

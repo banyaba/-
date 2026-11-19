@@ -3,6 +3,7 @@ export type UserRole = 'admin' | 'user';
 export type PageId =
   | 'dashboard'
   | 'add-data'
+  | 'bookings'
   | 'data-table'
   | 'statistics'
   | 'students'
@@ -17,6 +18,17 @@ export const CLASS_LIST: readonly string[] = [
   'ป.4/1', 'ป.4/2', 'ป.4/3',
   'ป.5/1', 'ป.5/2', 'ป.5/3',
   'ป.6/1', 'ป.6/2', 'ป.6/3',
+];
+
+export const EXTERNAL_VISITOR_CLASS = 'บุคคลภายนอก';
+
+export const EXTERNAL_VISITOR_CATEGORIES: readonly string[] = [
+  'ผู้ปกครองนักเรียน',
+  'ครู/บุคลากรต่างโรงเรียน',
+  'เจ้าหน้าที่/หน่วยงานภายนอก',
+  'นักเรียนต่างโรงเรียน',
+  'ประชาชนทั่วไป / ชุมชน',
+  'วิทยากร / ผู้มาติดต่อราชการ',
 ];
 
 export const COMPUTER_ROOMS: readonly string[] = ['คอม1', 'คอม2'];
@@ -97,6 +109,36 @@ export interface UsageLog {
   recorder: string;
   createdAt: string;
 }
+
+export type BookingStatus = 'pending' | 'approved' | 'rejected';
+
+export type BookingMode = 'individual' | 'full_room';
+
+export interface RoomBooking {
+  id: string;
+  bookingMode: BookingMode;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  computerRoom: string; // คอม1 | คอม2
+  computerNumber?: string; // 1 - 30 (สำหรับจองรายคน)
+  requesterName: string;
+  className: string; // ชั้นเรียน หรือ บุคคลภายนอก / หลายชั้นเรียน
+  subjectName: string;
+  seatCount: number;
+  note?: string;
+  status: BookingStatus;
+  decisionNote?: string;
+  decidedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const BOOKING_GROUP_OPTIONS: readonly string[] = [
+  ...CLASS_LIST,
+  EXTERNAL_VISITOR_CLASS,
+  'หลายชั้นเรียน / กิจกรรมรวม',
+];
 
 export interface ThemeColors {
   primary: string;

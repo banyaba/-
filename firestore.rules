@@ -51,8 +51,24 @@ service cloud.firestore {
       return cls is string && cls.size() >= 2 && cls.size() <= 20 && cls.matches('^ป\\.[1-6]/[1-3]$');
     }
 
+    function isValidLogClassName(cls) {
+      return isValidClassName(cls) || (cls is string && cls == 'บุคคลภายนอก');
+    }
+
     function isValidHexColor(c) {
       return c is string && c.size() == 7 && c.matches('^#[0-9a-fA-F]{6}$');
+    }
+
+    function isValidBookingTime(t) {
+      return t is string && t.size() == 5 && t.matches('^([01]\\d|2[0-3]):[0-5]\\d$');
+    }
+
+    function isValidBookingStatus(s) {
+      return s is string && s.size() <= 20 && s in ['pending', 'approved', 'rejected'];
+    }
+
+    function isValidBookingMode(m) {
+      return m is string && m.size() <= 20 && m in ['individual', 'full_room'];
     }
 
     // --- Validation Blueprints ---
@@ -97,7 +113,7 @@ service cloud.firestore {
         && data.computerNumber is string && data.computerNumber.size() <= 16
         && data.studentId is string && data.studentId.size() <= 128
         && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120
-        && isValidClassName(data.className)
+        && isValidLogClassName(data.className)
         && data.subjectId is string && data.subjectId.size() <= 128
         && data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 120
         && data.usageTypes is list && data.usageTypes.size() <= 30
@@ -154,6 +170,41 @@ service cloud.firestore {
         && isValidSha256Hash(data.adminPinHash)
         && isValidSha256Hash(data.userPinHash)
         && isValidId(data.ownerId)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidRoomBooking(data) {
+      return data.keys().hasAll([
+          'date', 'startTime', 'endTime', 'computerRoom',
+          'requesterName', 'className', 'subjectName', 'seatCount',
+          'note', 'status', 'decisionNote', 'decidedBy',
+          'ownerId', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'bookingMode', 'computerNumber',
+          'date', 'startTime', 'endTime', 'computerRoom',
+          'requesterName', 'className', 'subjectName', 'seatCount',
+          'note', 'status', 'decisionNote', 'decidedBy',
+          'ownerId', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && (!('bookingMode' in data) || isValidBookingMode(data.bookingMode))
+        && (!('computerNumber' in data) || (data.computerNumber is string && data.computerNumber.size() <= 16))
+        && data.date is string && data.date.size() == 10 && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && isValidBookingTime(data.startTime)
+        && isValidBookingTime(data.endTime)
+        && data.endTime > data.startTime
+        && data.computerRoom is string && data.computerRoom.size() >= 1 && data.computerRoom.size() <= 32
+        && data.requesterName is string && data.requesterName.size() >= 1 && data.requesterName.size() <= 120
+        && data.className is string && data.className.size() >= 2 && data.className.size() <= 40
+        && data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 120
+        && data.seatCount is int && data.seatCount >= 1 && data.seatCount <= 100
+        && data.note is string && data.note.size() <= 300
+        && isValidBookingStatus(data.status)
+        && data.decisionNote is string && data.decisionNote.size() <= 300
+        && data.decidedBy is string && data.decidedBy.size() <= 120
+        && isValidId(data.ownerId)
+        && data.visibility is string && data.visibility == 'school' && data.visibility.size() <= 20
+        && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
 
@@ -268,6 +319,33 @@ service cloud.firestore {
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly(['adminPinHash', 'userPinHash', 'updatedAt']);
       allow delete: if false;
+    }
+
+    // Computer Lab Room Bookings (Anyone can request a booking; only Admin can approve/reject)
+    match /bookings/{bookingId} {
+      allow get: if isValidId(bookingId) && (isAdmin() || existing().visibility == 'school');
+      allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
+      allow create: if isValidId(bookingId)
+        && isValidRoomBooking(incoming())
+        && 'bookingMode' in incoming()
+        && 'computerNumber' in incoming()
+        && (incoming().bookingMode != 'individual' || incoming().computerNumber.size() >= 1)
+        && isValidActorOwnerId(incoming().ownerId)
+        && incoming().status == 'pending'
+        && incoming().decisionNote == ''
+        && incoming().decidedBy == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(bookingId)
+        && isValidRoomBooking(incoming())
+        && (isAdmin() || !isSignedIn())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'decisionNote', 'decidedBy', 'updatedAt'
+        ]);
+      allow delete: if isValidId(bookingId) && (isAdmin() || (!isSignedIn() && existing().visibility == 'school'));
     }
   }
 }

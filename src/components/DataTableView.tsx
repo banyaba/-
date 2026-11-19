@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Search, Calendar, Trash2, Pencil, RotateCcw } from 'lucide-react';
-import { CLASS_LIST, type Subject, type UsageLog, type UserRole } from '../types';
+import { CLASS_LIST, EXTERNAL_VISITOR_CLASS, type Subject, type UsageLog, type UserRole } from '../types';
 import { formatBuddhistISO, getTodayISO } from '../utils/thaiDate';
 import { api } from '../api/client';
 import { ConfirmModal } from './ConfirmModal';
@@ -157,6 +157,7 @@ export function DataTableView({
                     {cls}
                   </option>
                 ))}
+                <option value={EXTERNAL_VISITOR_CLASS}>{EXTERNAL_VISITOR_CLASS}</option>
               </select>
             </div>
 
@@ -261,7 +262,13 @@ export function DataTableView({
                     <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {log.studentName}
                     </td>
-                    <td className="px-4 py-2.5 font-medium text-teal-700 dark:text-teal-300 whitespace-nowrap">
+                    <td
+                      className={`px-4 py-2.5 font-medium whitespace-nowrap ${
+                        log.className === EXTERNAL_VISITOR_CLASS
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : 'text-teal-700 dark:text-teal-300'
+                      }`}
+                    >
                       {log.className}
                     </td>
                     <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">

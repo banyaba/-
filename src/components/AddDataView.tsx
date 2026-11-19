@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   UserPlus,
   Users,
+  UserCheck,
   CheckSquare,
   Square,
   Save,
@@ -15,6 +16,8 @@ import {
   CLASS_LIST,
   COMPUTER_ROOMS,
   COMPUTER_STATIONS,
+  EXTERNAL_VISITOR_CATEGORIES,
+  EXTERNAL_VISITOR_CLASS,
   type Student,
   type Subject,
   type UsageLog,
@@ -51,7 +54,7 @@ export function AddDataView({
   onUsageTypesChanged,
   onNotify,
 }: AddDataViewProps) {
-  const [activeTab, setActiveTab] = useState<'individual' | 'batch'>('individual');
+  const [activeTab, setActiveTab] = useState<'individual' | 'batch' | 'external'>('individual');
 
   const studentCountByClass = useMemo(() => {
     const map: Record<string, number> = {};
@@ -97,6 +100,20 @@ export function AddDataView({
   const [batchSaving, setBatchSaving] = useState(false);
   const [manageModalOpen, setManageModalOpen] = useState(false);
 
+  // External Visitor Tab State (แท็บ 3: บุคคลภายนอก)
+  const [extDate, setExtDate] = useState(getTodayISO());
+  const [extTimeIn, setExtTimeIn] = useState(getCurrentTimeHHMM());
+  const [extComputerRoom, setExtComputerRoom] = useState(COMPUTER_ROOMS[0]);
+  const [extComputerNumber, setExtComputerNumber] = useState('1');
+  const [extVisitorName, setExtVisitorName] = useState('');
+  const [extCategory, setExtCategory] = useState(EXTERNAL_VISITOR_CATEGORIES[0]);
+  const [extCustomCategory, setExtCustomCategory] = useState('');
+  const [extUsageTypes, setExtUsageTypes] = useState<string[]>(['ค้นคว้าข้อมูล']);
+  const [extCustomUsage, setExtCustomUsage] = useState('');
+  const [extNote, setExtNote] = useState('');
+  const [extRecorder, setExtRecorder] = useState(defaultRecorder);
+  const [extSaving, setExtSaving] = useState(false);
+
   // Sync default subject when subjects load
   useEffect(() => {
     if (subjects.length > 0 && !indSubjectName) {
@@ -107,9 +124,29 @@ export function AddDataView({
     }
   }, [subjects, indSubjectName, batchSubjectName]);
 
-  // Populate Individual Tab when editingLog changes
+  // Populate Individual or External Tab when editingLog changes
   useEffect(() => {
     if (editingLog) {
+      if (editingLog.className === EXTERNAL_VISITOR_CLASS) {
+        setActiveTab('external');
+        setExtDate(editingLog.date);
+        setExtTimeIn(editingLog.timeIn || '');
+        setExtComputerRoom(editingLog.computerRoom || COMPUTER_ROOMS[0]);
+        setExtComputerNumber(editingLog.computerNumber || '');
+        setExtVisitorName(editingLog.studentName);
+        if (EXTERNAL_VISITOR_CATEGORIES.includes(editingLog.subjectName)) {
+          setExtCategory(editingLog.subjectName);
+          setExtCustomCategory('');
+        } else {
+          setExtCategory('__custom__');
+          setExtCustomCategory(editingLog.subjectName);
+        }
+        setExtUsageTypes(editingLog.usageTypes);
+        setExtNote(editingLog.note || '');
+        setExtRecorder(editingLog.recorder);
+        return;
+      }
+
       setActiveTab('individual');
       setIndDate(editingLog.date);
       setIndTimeIn(editingLog.timeIn || '');
@@ -200,6 +237,7 @@ export function AddDataView({
     };
     setIndUsageTypes((prev) => syncList(prev));
     setBatchUsageTypes((prev) => syncList(prev));
+    setExtUsageTypes((prev) => syncList(prev));
   };
 
   const indDisplayUsageTypes = useMemo(
@@ -212,8 +250,18 @@ export function AddDataView({
     [usageTypes, batchUsageTypes]
   );
 
-  const handleQuickAddUsageType = async (mode: 'individual' | 'batch') => {
-    const raw = mode === 'individual' ? indCustomUsage : batchCustomUsage;
+  const extDisplayUsageTypes = useMemo(
+    () => Array.from(new Set([...usageTypes, ...extUsageTypes])),
+    [usageTypes, extUsageTypes]
+  );
+
+  const handleQuickAddUsageType = async (mode: 'individual' | 'batch' | 'external') => {
+    const raw =
+      mode === 'individual'
+        ? indCustomUsage
+        : mode === 'batch'
+        ? batchCustomUsage
+        : extCustomUsage;
     const trimmed = raw.trim();
     if (!trimmed) {
       onNotify('error', 'กรุณากรอกรูปแบบการใช้ที่ต้องการเพิ่ม');
@@ -222,14 +270,17 @@ export function AddDataView({
 
     const clearInput = () => {
       if (mode === 'individual') setIndCustomUsage('');
-      else setBatchCustomUsage('');
+      else if (mode === 'batch') setBatchCustomUsage('');
+      else setExtCustomUsage('');
     };
 
     const selectValue = (val: string) => {
       if (mode === 'individual') {
         setIndUsageTypes((prev) => (prev.includes(val) ? prev : [...prev, val]));
-      } else {
+      } else if (mode === 'batch') {
         setBatchUsageTypes((prev) => (prev.includes(val) ? prev : [...prev, val]));
+      } else {
+        setExtUsageTypes((prev) => (prev.includes(val) ? prev : [...prev, val]));
       }
     };
 
@@ -367,14 +418,78 @@ export function AddDataView({
     }
   };
 
+  const resetExternalForm = () => {
+    setExtDate(getTodayISO());
+    setExtTimeIn(getCurrentTimeHHMM());
+    setExtVisitorName('');
+    setExtCategory(EXTERNAL_VISITOR_CATEGORIES[0]);
+    setExtCustomCategory('');
+    setExtCustomUsage('');
+    setExtUsageTypes(usageTypes[0] ? [usageTypes[0]] : []);
+    setExtNote('');
+    setExtRecorder(defaultRecorder);
+  };
+
+  const handleExternalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const resolvedCategory =
+      extCategory === '__custom__' ? extCustomCategory.trim() : extCategory.trim();
+
+    if (!extDate || !extVisitorName.trim() || !resolvedCategory || !extRecorder.trim()) {
+      onNotify('error', 'กรุณากรอกข้อมูลบุคคลภายนอกที่มีเครื่องหมาย * ให้ครบถ้วน');
+      return;
+    }
+
+    const finalUsageTypes = mergeCustomUsage(extUsageTypes, extCustomUsage);
+    setExtSaving(true);
+    try {
+      const payload = {
+        date: extDate,
+        timeIn: extTimeIn,
+        computerRoom: extComputerRoom,
+        computerNumber: extComputerNumber,
+        studentId: undefined,
+        studentName: extVisitorName.trim(),
+        className: EXTERNAL_VISITOR_CLASS,
+        subjectId: undefined,
+        subjectName: resolvedCategory,
+        usageTypes: finalUsageTypes,
+        note: extNote.trim(),
+        recorder: extRecorder.trim(),
+      };
+
+      if (editingLog && editingLog.className === EXTERNAL_VISITOR_CLASS) {
+        const updated = await api.updateLog(editingLog.id, payload);
+        onLogSaved(updated, true);
+        onNotify('success', 'อัปเดตข้อมูลบุคคลภายนอกเรียบร้อยแล้ว');
+        resetExternalForm();
+      } else {
+        const created = await api.createLog(payload);
+        onLogSaved(created, false);
+        onNotify('success', `บันทึกข้อมูลบุคคลภายนอก (${created.studentName}) สำเร็จ`);
+        resetExternalForm();
+      }
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถบันทึกข้อมูลบุคคลภายนอกได้');
+    } finally {
+      setExtSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Segmented Mode Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200/80 dark:border-blue-900/60 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 dark:from-slate-900 dark:to-blue-950/40 p-1.5">
+        <div className="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-blue-200/80 dark:border-blue-900/60 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 dark:from-slate-900 dark:to-blue-950/40 p-1.5">
           <button
             type="button"
-            onClick={() => setActiveTab('individual')}
+            onClick={() => {
+              if (editingLog && editingLog.className === EXTERNAL_VISITOR_CLASS) {
+                onCancelEdit();
+                resetExternalForm();
+              }
+              setActiveTab('individual');
+            }}
             className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'individual'
                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
@@ -399,9 +514,27 @@ export function AddDataView({
             <Users className="h-4 w-4" />
             <span>แท็บ 2: รายชั้น (Batch Import)</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (editingLog && editingLog.className !== EXTERNAL_VISITOR_CLASS) {
+                onCancelEdit();
+                resetIndividualForm();
+              }
+              setActiveTab('external');
+            }}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
+              activeTab === 'external'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/70 hover:text-emerald-700 dark:hover:text-emerald-300'
+            }`}
+          >
+            <UserCheck className="h-4 w-4" />
+            <span>แท็บ 3: บุคคลภายนอก</span>
+          </button>
         </div>
 
-        {editingLog && activeTab === 'individual' && (
+        {editingLog && (activeTab === 'individual' || activeTab === 'external') && (
           <div className="flex items-center gap-3 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-amber-50/80 dark:bg-amber-950/40 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
             <span>กำลังแก้ไขข้อมูลของ: {editingLog.studentName}</span>
             <button
@@ -409,6 +542,7 @@ export function AddDataView({
               onClick={() => {
                 onCancelEdit();
                 resetIndividualForm();
+                resetExternalForm();
               }}
               className="inline-flex items-center gap-1 rounded-md border border-amber-300/80 dark:border-amber-700 bg-white dark:bg-slate-800 px-2 py-0.5 text-slate-700 dark:text-slate-200 hover:bg-amber-100/60 dark:hover:bg-slate-700"
             >
@@ -420,7 +554,7 @@ export function AddDataView({
       </div>
 
       {/* Tab 1: Individual Entry */}
-      {activeTab === 'individual' ? (
+      {activeTab === 'individual' && (
         <form
           onSubmit={handleIndividualSubmit}
           className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden"
@@ -776,8 +910,10 @@ export function AddDataView({
           </div>
           </div>
         </form>
-      ) : (
-        /* Tab 2: Batch Class Entry */
+      )}
+
+      {/* Tab 2: Batch Class Entry */}
+      {activeTab === 'batch' && (
         <form
           onSubmit={handleBatchSubmit}
           className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden"
@@ -1103,6 +1239,297 @@ export function AddDataView({
               </span>
             </button>
           </div>
+          </div>
+        </form>
+      )}
+
+      {/* Tab 3: External Visitor Entry (บุคคลภายนอก) */}
+      {activeTab === 'external' && (
+        <form
+          onSubmit={handleExternalSubmit}
+          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-emerald-100/80 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-transparent dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-transparent px-6 py-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-xs shrink-0">
+                <UserCheck className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {editingLog && editingLog.className === EXTERNAL_VISITOR_CLASS
+                    ? 'แก้ไขบันทึกการใช้ห้องคอมพิวเตอร์ (บุคคลภายนอก)'
+                    : 'บันทึกการใช้ห้องคอมพิวเตอร์สำหรับบุคคลภายนอก'}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  สำหรับผู้ปกครอง ครูต่างโรงเรียน เจ้าหน้าที่ หรือบุคคลทั่วไปที่ไม่ได้อยู่ในรายชื่อนักเรียน
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="ext-date" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  วันที่ <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="ext-date"
+                  type="date"
+                  required
+                  value={extDate}
+                  onChange={(e) => setExtDate(e.target.value)}
+                  className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="ext-time" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  เข้าใช้ (เวลา)
+                </label>
+                <input
+                  id="ext-time"
+                  type="time"
+                  value={extTimeIn}
+                  onChange={(e) => setExtTimeIn(e.target.value)}
+                  className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="ext-room" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    ห้องคอม
+                  </label>
+                  <select
+                    id="ext-room"
+                    value={extComputerRoom}
+                    onChange={(e) => setExtComputerRoom(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {COMPUTER_ROOMS.map((room) => (
+                      <option key={room} value={room}>
+                        {room}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="ext-station" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    เครื่องที่ใช้
+                  </label>
+                  <select
+                    id="ext-station"
+                    value={extComputerNumber}
+                    onChange={(e) => setExtComputerNumber(e.target.value)}
+                    className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">ไม่ระบุ</option>
+                    {COMPUTER_STATIONS.map((num) => (
+                      <option key={num} value={num}>
+                        เครื่องที่ {num}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label htmlFor="ext-name" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  ชื่อ–สกุล บุคคลภายนอก <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="ext-name"
+                  type="text"
+                  required
+                  value={extVisitorName}
+                  onChange={(e) => setExtVisitorName(e.target.value)}
+                  placeholder="กรอกชื่อ-นามสกุล หรือคำนำหน้าของผู้เข้าใช้งาน"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="ext-category" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  ประเภทบุคคลภายนอก <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  id="ext-category"
+                  required
+                  value={extCategory}
+                  onChange={(e) => setExtCategory(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {EXTERNAL_VISITOR_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                  <option value="__custom__">อื่นๆ (ระบุประเภท/วัตถุประสงค์เอง)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {extCategory === '__custom__' && (
+                <div>
+                  <label htmlFor="ext-custom-cat" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    ระบุประเภท / วัตถุประสงค์ <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id="ext-custom-cat"
+                    type="text"
+                    required
+                    value={extCustomCategory}
+                    onChange={(e) => setExtCustomCategory(e.target.value)}
+                    placeholder="เช่น คณะศึกษาดูงาน, ช่างซ่อมบำรุงเครือข่าย"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              )}
+
+              <div className={extCategory === '__custom__' ? '' : 'md:col-span-2'}>
+                <label htmlFor="ext-recorder" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  ครูผู้สอน / ผู้ดูแลห้อง <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="ext-recorder"
+                  type="text"
+                  required
+                  value={extRecorder}
+                  onChange={(e) => setExtRecorder(e.target.value)}
+                  placeholder="ชื่อครูผู้สอนหรือเจ้าหน้าที่ผู้รับผิดชอบ"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Usage Types Checkboxes */}
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  รูปแบบการใช้ (เลือกได้หลายตัวเลือก)
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    เลือกแล้ว {extUsageTypes.length} รายการ
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setManageModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/70 bg-indigo-50/70 dark:bg-indigo-950/40 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 transition-colors"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    <span>{role === 'admin' ? 'เพิ่ม / แก้ไข / ลบตัวเลือก' : 'เพิ่ม / แก้ไขตัวเลือก'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline Custom Usage Input (Top) */}
+              <div className="mb-3 flex flex-col sm:flex-row gap-2">
+                <input
+                  id="ext-custom-usage"
+                  type="text"
+                  value={extCustomUsage}
+                  onChange={(e) => setExtCustomUsage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleQuickAddUsageType('external');
+                    }
+                  }}
+                  placeholder="เพิ่มรูปแบบการใช้งานเอง (เช่น ประชุมออนไลน์, พิมพ์เอกสารราชการ)..."
+                  className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <button
+                  type="button"
+                  disabled={addingCustomUsage || !extCustomUsage.trim()}
+                  onClick={() => handleQuickAddUsageType('external')}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50 dark:bg-emerald-950/60 px-3.5 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 disabled:opacity-50 whitespace-nowrap shrink-0 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>{addingCustomUsage ? 'กำลังเพิ่ม...' : 'เพิ่มและเลือก'}</span>
+                </button>
+              </div>
+
+              {extDisplayUsageTypes.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 px-4 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                  ยังไม่มีตัวเลือกรูปแบบการใช้ กรอกเพิ่มด้านบนหรือกดปุ่มจัดการตัวเลือก
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                  {extDisplayUsageTypes.map((type) => {
+                    const checked = extUsageTypes.includes(type);
+                    return (
+                      <label
+                        key={type}
+                        className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-xs font-medium cursor-pointer transition-colors ${
+                          checked
+                            ? 'border-emerald-400 bg-gradient-to-br from-emerald-50 to-teal-50/80 text-emerald-900 dark:border-emerald-500/80 dark:from-emerald-950/60 dark:to-teal-950/50 dark:text-emerald-100'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:border-emerald-200 hover:bg-emerald-50/30 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleUsageType(extUsageTypes, setExtUsageTypes, type)}
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="truncate">{type}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="ext-note" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                สังกัด / หน่วยงาน / เบอร์ติดต่อ / หมายเหตุ (ไม่บังคับ)
+              </label>
+              <input
+                id="ext-note"
+                type="text"
+                value={extNote}
+                onChange={(e) => setExtNote(e.target.value)}
+                placeholder="เช่น สังกัด สพป. / โทร 08x-xxx-xxxx / รายละเอียดเพิ่มเติม"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+              {editingLog && editingLog.className === EXTERNAL_VISITOR_CLASS && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCancelEdit();
+                    resetExternalForm();
+                  }}
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={extSaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 whitespace-nowrap"
+              >
+                {editingLog && editingLog.className === EXTERNAL_VISITOR_CLASS ? (
+                  <RefreshCw className="h-4 w-4" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span>
+                  {extSaving
+                    ? 'กำลังบันทึก...'
+                    : editingLog && editingLog.className === EXTERNAL_VISITOR_CLASS
+                    ? 'อัปเดตข้อมูล'
+                    : 'บันทึกข้อมูลบุคคลภายนอก'}
+                </span>
+              </button>
+            </div>
           </div>
         </form>
       )}

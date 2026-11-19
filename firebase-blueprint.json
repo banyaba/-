@@ -137,8 +137,8 @@
           "type": "string",
           "minLength": 2,
           "maxLength": 20,
-          "pattern": "^ป\\.[1-6]/[1-3]$",
-          "description": "Classroom identifier."
+          "pattern": "^(ป\\.[1-6]/[1-3]|บุคคลภายนอก)$",
+          "description": "Classroom identifier (ป.1/1 - ป.6/3) or external visitor label (บุคคลภายนอก)."
         },
         "subjectId": {
           "type": "string",
@@ -321,6 +321,137 @@
         }
       },
       "required": ["adminPinHash", "userPinHash", "ownerId", "updatedAt"]
+    },
+    "RoomBooking": {
+      "title": "RoomBooking",
+      "description": "Computer lab reservation request (individual workstation or full room) and admin approval record.",
+      "type": "object",
+      "properties": {
+        "bookingMode": {
+          "type": "string",
+          "enum": ["individual", "full_room"],
+          "maxLength": 20,
+          "description": "Reservation type: individual workstation or full room."
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Booking ISO date (YYYY-MM-DD)."
+        },
+        "startTime": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 5,
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "description": "Start time (HH:mm)."
+        },
+        "endTime": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 5,
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "description": "End time (HH:mm)."
+        },
+        "computerRoom": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "Target computer room (e.g. คอม1, คอม2)."
+        },
+        "computerNumber": {
+          "type": "string",
+          "maxLength": 16,
+          "description": "Specific workstation number (1-30) for individual booking, or empty for full room."
+        },
+        "requesterName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Name of teacher, student, or external requester."
+        },
+        "className": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40,
+          "description": "Class or group requesting the lab."
+        },
+        "subjectName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Subject or activity purpose."
+        },
+        "seatCount": {
+          "type": "integer",
+          "description": "Requested number of workstations (1-100)."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Optional requester note."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"],
+          "maxLength": 20,
+          "description": "Approval status controlled by admin."
+        },
+        "decisionNote": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Optional admin decision note."
+        },
+        "decidedBy": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Name of admin who approved or rejected."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the creator."
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["school"],
+          "maxLength": 20,
+          "description": "Shared school visibility scope."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp."
+        }
+      },
+      "required": [
+        "bookingMode",
+        "date",
+        "startTime",
+        "endTime",
+        "computerRoom",
+        "computerNumber",
+        "requesterName",
+        "className",
+        "subjectName",
+        "seatCount",
+        "note",
+        "status",
+        "decisionNote",
+        "decidedBy",
+        "ownerId",
+        "visibility",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -347,6 +478,10 @@
     "/security/{docId}": {
       "schema": { "$ref": "#/entities/SecurityPins" },
       "description": "Admin-only hashed 6-digit login PIN settings (ID: pins)."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/RoomBooking" },
+      "description": "Computer lab room bookings with admin-only approval status."
     }
   }
 }

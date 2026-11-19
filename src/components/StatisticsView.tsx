@@ -106,6 +106,7 @@ interface InteractivePieCardProps {
   data: PieDatum[];
   totalValue: number;
   onPrint?: () => void;
+  printButtonClass?: string;
   printHidden?: boolean;
   isPrintTarget?: boolean;
   printHeader?: {
@@ -128,6 +129,7 @@ function InteractivePieCard({
   data,
   totalValue,
   onPrint,
+  printButtonClass = 'border-sky-200 dark:border-sky-800/80 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-slate-700',
   printHidden = false,
   isPrintTarget = false,
   printHeader,
@@ -203,7 +205,7 @@ function InteractivePieCard({
             <button
               type="button"
               onClick={onPrint}
-              className="no-print inline-flex items-center gap-1.5 rounded-lg border border-sky-200 dark:border-sky-800/80 bg-white/95 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-slate-700 shadow-2xs transition-colors whitespace-nowrap"
+              className={`no-print inline-flex items-center gap-1.5 rounded-lg border bg-white/95 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold shadow-2xs transition-colors whitespace-nowrap ${printButtonClass}`}
               title={`พิมพ์${title}`}
             >
               <Printer className="h-3.5 w-3.5" />
@@ -403,7 +405,7 @@ export function StatisticsView({ logs, settings }: StatisticsViewProps) {
   const [semester, setSemester] = useState<'1' | '2'>('1');
   const [academicYear, setAcademicYear] = useState<number>(defaultBeYear);
   const [yearlyMode, setYearlyMode] = useState<'academic' | 'calendar'>('academic');
-  const [printingChart, setPrintingChart] = useState<'classes' | null>(null);
+  const [printingChart, setPrintingChart] = useState<'classes' | 'usage' | null>(null);
 
   useEffect(() => {
     const handleAfterPrint = () => {
@@ -413,8 +415,8 @@ export function StatisticsView({ logs, settings }: StatisticsViewProps) {
     return () => window.removeEventListener('afterprint', handleAfterPrint);
   }, []);
 
-  const handlePrintClassesChart = () => {
-    setPrintingChart('classes');
+  const handlePrintChart = (target: 'classes' | 'usage') => {
+    setPrintingChart(target);
     setTimeout(() => {
       window.print();
     }, 80);
@@ -846,7 +848,8 @@ export function StatisticsView({ logs, settings }: StatisticsViewProps) {
           unitLabel="ครั้ง"
           data={classPieData}
           totalValue={filteredLogs.length}
-          onPrint={handlePrintClassesChart}
+          onPrint={() => handlePrintChart('classes')}
+          printHidden={printingChart === 'usage'}
           isPrintTarget={printingChart === 'classes'}
           printHeader={{
             schoolName: settings.schoolName,
@@ -859,7 +862,7 @@ export function StatisticsView({ logs, settings }: StatisticsViewProps) {
 
         <InteractivePieCard
           title="กราฟวงกลมแสดงรูปแบบการใช้"
-          subtitle="สัดส่วนกิจกรรมและรูปแบบการใช้ห้องคอมพิวเตอร์ทั้งหมด"
+          subtitle="กิจกรรมและรูปแบบการใช้ห้องคอมพิวเตอร์"
           icon={Layers}
           headerGradient="from-violet-50/90 via-fuchsia-50/70 to-transparent dark:from-violet-950/40 dark:via-fuchsia-950/30 dark:to-transparent"
           iconGradient="from-violet-600 to-fuchsia-600"
@@ -867,7 +870,17 @@ export function StatisticsView({ logs, settings }: StatisticsViewProps) {
           unitLabel="ครั้ง"
           data={usagePieData}
           totalValue={totalUsageSelections}
+          onPrint={() => handlePrintChart('usage')}
+          printButtonClass="border-violet-200 dark:border-violet-800/80 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-slate-700"
           printHidden={printingChart === 'classes'}
+          isPrintTarget={printingChart === 'usage'}
+          printHeader={{
+            schoolName: settings.schoolName,
+            periodLabel,
+            academicYear: settings.academicYear,
+            labManager: settings.labManager,
+            printedDate: todayThai,
+          }}
         />
       </div>
     </div>

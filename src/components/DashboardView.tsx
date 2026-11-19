@@ -203,7 +203,7 @@ export function DashboardView({
               className="inline-flex items-center gap-2 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50/70 dark:bg-teal-950/40 px-4 py-2.5 text-sm font-semibold text-teal-800 dark:text-teal-200 hover:bg-teal-100/80 dark:hover:bg-teal-900/50 transition-colors whitespace-nowrap shrink-0"
             >
               <Table2 className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-              <span>ตารางข้อมูล</span>
+              <span>ประวัติการใช้</span>
             </button>
 
             {role === 'admin' && (
