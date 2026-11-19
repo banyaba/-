@@ -261,7 +261,7 @@ export function StudentsView({
           }`}
         >
           <UserPlus className="h-4 w-4" />
-          <span>แท็บ 1: เพิ่มนักเรียน</span>
+          <span>เพิ่มนักเรียน</span>
         </button>
 
         <button
@@ -274,7 +274,7 @@ export function StudentsView({
           }`}
         >
           <FileSpreadsheet className="h-4 w-4" />
-          <span>แท็บ 2: เพิ่มหลายคน (Bulk Import)</span>
+          <span>เพิ่มหลายคน</span>
         </button>
 
         <button
@@ -290,7 +290,7 @@ export function StudentsView({
           }`}
         >
           <School className="h-4 w-4" />
-          <span>แท็บ 3: จัดการชั้น</span>
+          <span>จัดการชั้น</span>
         </button>
       </div>
 
