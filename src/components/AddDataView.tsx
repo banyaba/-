@@ -512,7 +512,7 @@ export function AddDataView({
             }`}
           >
             <UserPlus className="h-4 w-4" />
-            <span>แท็บ 1: รายบุคคล</span>
+            <span>รายบุคคล</span>
           </button>
           <button
             type="button"
@@ -527,7 +527,7 @@ export function AddDataView({
             }`}
           >
             <Users className="h-4 w-4" />
-            <span>แท็บ 2: รายชั้น (Batch Import)</span>
+            <span>รายชั้น</span>
           </button>
           <button
             type="button"
@@ -545,7 +545,7 @@ export function AddDataView({
             }`}
           >
             <UserCheck className="h-4 w-4" />
-            <span>แท็บ 3: บุคคลภายนอก</span>
+            <span>บุคคลภายนอก</span>
           </button>
         </div>
 
