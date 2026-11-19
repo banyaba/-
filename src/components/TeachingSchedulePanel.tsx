@@ -51,6 +51,65 @@ const SCHEDULE_CLASS_OPTIONS: readonly string[] = [
   'อบรม / กิจกรรมพิเศษ',
 ];
 
+interface TeacherColorTheme {
+  boxClass: string;
+  iconClass: string;
+  swatchClass: string;
+  cardBorderAccentClass: string;
+  legendTextClass: string;
+}
+
+const TEACHER_COLOR_PALETTE: readonly TeacherColorTheme[] = [
+  {
+    boxClass:
+      'border-orange-200/90 bg-orange-50/95 text-orange-800 dark:border-orange-800/70 dark:bg-orange-950/45 dark:text-orange-200',
+    iconClass: 'text-orange-600 dark:text-orange-400',
+    swatchClass: 'bg-orange-500 dark:bg-orange-400',
+    cardBorderAccentClass: 'border-l-[3px] border-l-orange-500 dark:border-l-orange-400',
+    legendTextClass: 'text-orange-800 dark:text-orange-200',
+  },
+  {
+    boxClass:
+      'border-teal-200/90 bg-teal-50/95 text-teal-800 dark:border-teal-800/70 dark:bg-teal-950/45 dark:text-teal-200',
+    iconClass: 'text-teal-600 dark:text-teal-400',
+    swatchClass: 'bg-teal-500 dark:bg-teal-400',
+    cardBorderAccentClass: 'border-l-[3px] border-l-teal-500 dark:border-l-teal-400',
+    legendTextClass: 'text-teal-800 dark:text-teal-200',
+  },
+  {
+    boxClass:
+      'border-fuchsia-200/90 bg-fuchsia-50/95 text-fuchsia-800 dark:border-fuchsia-800/70 dark:bg-fuchsia-950/45 dark:text-fuchsia-200',
+    iconClass: 'text-fuchsia-600 dark:text-fuchsia-400',
+    swatchClass: 'bg-fuchsia-500 dark:bg-fuchsia-400',
+    cardBorderAccentClass: 'border-l-[3px] border-l-fuchsia-500 dark:border-l-fuchsia-400',
+    legendTextClass: 'text-fuchsia-800 dark:text-fuchsia-200',
+  },
+  {
+    boxClass:
+      'border-amber-200/90 bg-amber-50/95 text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/45 dark:text-amber-200',
+    iconClass: 'text-amber-600 dark:text-amber-400',
+    swatchClass: 'bg-amber-500 dark:bg-amber-400',
+    cardBorderAccentClass: 'border-l-[3px] border-l-amber-500 dark:border-l-amber-400',
+    legendTextClass: 'text-amber-800 dark:text-amber-200',
+  },
+  {
+    boxClass:
+      'border-cyan-200/90 bg-cyan-50/95 text-cyan-800 dark:border-cyan-800/70 dark:bg-cyan-950/45 dark:text-cyan-200',
+    iconClass: 'text-cyan-600 dark:text-cyan-400',
+    swatchClass: 'bg-cyan-500 dark:bg-cyan-400',
+    cardBorderAccentClass: 'border-l-[3px] border-l-cyan-500 dark:border-l-cyan-400',
+    legendTextClass: 'text-cyan-800 dark:text-cyan-200',
+  },
+  {
+    boxClass:
+      'border-rose-200/90 bg-rose-50/95 text-rose-800 dark:border-rose-800/70 dark:bg-rose-950/45 dark:text-rose-200',
+    iconClass: 'text-rose-600 dark:text-rose-400',
+    swatchClass: 'bg-rose-500 dark:bg-rose-400',
+    cardBorderAccentClass: 'border-l-[3px] border-l-rose-500 dark:border-l-rose-400',
+    legendTextClass: 'text-rose-800 dark:text-rose-200',
+  },
+];
+
 export function TeachingSchedulePanel({
   role,
   schedules,
@@ -109,6 +168,44 @@ export function TeachingSchedulePanel({
     }
     return map;
   }, [schedules]);
+
+  const { orderedTeachers, teacherThemeMap } = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+
+    for (const candidate of [settings.labManager, ...(settings.labManagers || [])]) {
+      const clean = candidate?.trim();
+      if (clean && !seen.has(clean)) {
+        seen.add(clean);
+        list.push(clean);
+      }
+    }
+
+    const extraFromSchedules = Array.from(
+      new Set(
+        schedules
+          .map((s) => s.teacherName.trim())
+          .filter((name) => Boolean(name) && !seen.has(name))
+      )
+    ).sort((a, b) => a.localeCompare(b, 'th'));
+
+    for (const name of extraFromSchedules) {
+      seen.add(name);
+      list.push(name);
+    }
+
+    const themeMap = new Map<string, TeacherColorTheme>();
+    list.forEach((name, idx) => {
+      themeMap.set(name, TEACHER_COLOR_PALETTE[idx % TEACHER_COLOR_PALETTE.length]);
+    });
+
+    return { orderedTeachers: list, teacherThemeMap: themeMap };
+  }, [settings.labManager, settings.labManagers, schedules]);
+
+  const getTeacherTheme = (teacherName: string): TeacherColorTheme => {
+    const clean = teacherName.trim();
+    return teacherThemeMap.get(clean) || TEACHER_COLOR_PALETTE[0];
+  };
 
   const visibleRooms = useMemo(
     () => (roomFilter === 'all' ? [...COMPUTER_ROOMS] : [roomFilter]),
@@ -293,6 +390,7 @@ export function TeachingSchedulePanel({
     const isRoom1 = room === COMPUTER_ROOMS[0];
 
     if (slot) {
+      const teacherTheme = getTeacherTheme(slot.teacherName);
       return (
         <td
           key={`${room}_${day}_${periodCfg.period}`}
@@ -304,11 +402,11 @@ export function TeachingSchedulePanel({
                 ? () => openSlotModal(room, day, periodCfg.period, slot)
                 : undefined
             }
-            className={`group relative rounded-lg p-2.5 h-full min-h-[82px] border transition-all ${
+            className={`group relative rounded-lg p-2.5 h-full min-h-[84px] border transition-all ${
               isRoom1
                 ? 'border-sky-200 dark:border-sky-800/70 bg-white dark:bg-slate-900/90'
                 : 'border-emerald-200 dark:border-emerald-800/70 bg-white dark:bg-slate-900/90'
-            } ${role === 'admin' ? 'cursor-pointer hover:shadow-xs' : ''}`}
+            } ${teacherTheme.cardBorderAccentClass} ${role === 'admin' ? 'cursor-pointer hover:shadow-xs' : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
               <span
@@ -334,11 +432,12 @@ export function TeachingSchedulePanel({
               </span>
             </div>
             <div
-              className="mt-1.5 pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 text-orange-700 dark:text-orange-300"
+              className={`mt-1.5 rounded-md border px-1.5 py-1 flex items-center gap-1.5 ${teacherTheme.boxClass}`}
               title={`ครูผู้สอน: ${slot.teacherName}`}
             >
-              <User className="h-3.5 w-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
-              <span className="text-[11px] font-medium truncate">
+              <span className={`h-2 w-2 rounded-xs shrink-0 ${teacherTheme.swatchClass}`} />
+              <User className={`h-3 w-3 shrink-0 ${teacherTheme.iconClass}`} />
+              <span className="text-[11px] font-semibold truncate">
                 {slot.teacherName}
               </span>
             </div>
@@ -515,19 +614,39 @@ export function TeachingSchedulePanel({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 text-xs">
-                  <div className="flex items-center gap-2.5 text-[11px]">
+                <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
                     <span className="inline-flex items-center gap-1 font-semibold text-indigo-700 dark:text-indigo-300">
                       <BookOpen className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                       <span>วิชาที่สอน</span>
                     </span>
-                    <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">
-                      /
-                    </span>
-                    <span className="inline-flex items-center gap-1 font-semibold text-orange-700 dark:text-orange-300">
-                      <User className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
-                      <span>ครูผู้สอน</span>
-                    </span>
+                    {(() => {
+                      const roomTeachers = Array.from(
+                        new Set(
+                          schedules
+                            .filter((s) => s.computerRoom === room)
+                            .map((s) => s.teacherName.trim())
+                            .filter(Boolean)
+                        )
+                      );
+                      const legendTeachers =
+                        roomTeachers.length > 0
+                          ? orderedTeachers.filter((t) => roomTeachers.includes(t))
+                          : orderedTeachers.slice(0, 2);
+                      return legendTeachers.map((teacher) => {
+                        const tTheme = getTeacherTheme(teacher);
+                        return (
+                          <span
+                            key={teacher}
+                            className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-semibold ${tTheme.boxClass}`}
+                          >
+                            <span className={`h-2 w-2 rounded-xs shrink-0 ${tTheme.swatchClass}`} />
+                            <User className={`h-3 w-3 shrink-0 ${tTheme.iconClass}`} />
+                            <span className="truncate max-w-[150px]">{teacher}</span>
+                          </span>
+                        );
+                      });
+                    })()}
                   </div>
                   <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">
                     |
@@ -937,20 +1056,25 @@ export function TeachingSchedulePanel({
                       </datalist>
                       {managerList.length > 1 && (
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {managerList.map((m) => (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => setFormTeacherName(m)}
-                              className={`rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                                formTeacherName === m
-                                  ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
-                                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-                              }`}
-                            >
-                              {m}
-                            </button>
-                          ))}
+                          {managerList.map((m) => {
+                            const tTheme = getTeacherTheme(m);
+                            const isSelected = formTeacherName === m;
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setFormTeacherName(m)}
+                                className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                  isSelected
+                                    ? `${tTheme.boxClass} font-semibold`
+                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                                }`}
+                              >
+                                <span className={`h-2 w-2 rounded-xs shrink-0 ${tTheme.swatchClass}`} />
+                                <span>{m}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </>
