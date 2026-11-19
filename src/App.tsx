@@ -20,6 +20,7 @@ import {
   KeyRound,
   Lock,
   UserCheck,
+  PieChart,
 } from 'lucide-react';
 import {
   DEFAULT_SETTINGS,
@@ -49,6 +50,7 @@ import { PinCodeInput } from './components/PinCodeInput';
 import { DashboardView } from './components/DashboardView';
 import { AddDataView } from './components/AddDataView';
 import { DataTableView } from './components/DataTableView';
+import { StatisticsView } from './components/StatisticsView';
 import { StudentsView } from './components/StudentsView';
 import { SubjectsView } from './components/SubjectsView';
 import { ReportsView } from './components/ReportsView';
@@ -89,6 +91,14 @@ const NAV_ITEMS: NavItem[] = [
     iconClass: 'bg-teal-50 text-teal-600 dark:bg-teal-950/70 dark:text-teal-400',
     activeGradient: 'linear-gradient(135deg, #0d9488, #059669)',
     headerTint: 'from-teal-600 to-emerald-600',
+  },
+  {
+    id: 'statistics',
+    label: 'สถิติ',
+    icon: PieChart,
+    iconClass: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950/70 dark:text-cyan-400',
+    activeGradient: 'linear-gradient(135deg, #06b6d4, #2563eb)',
+    headerTint: 'from-cyan-500 to-blue-600',
   },
   {
     id: 'students',
@@ -938,6 +948,10 @@ export default function App() {
                   onLogsChanged={setLogs}
                   onNotify={notify}
                 />
+              )}
+
+              {activePage === 'statistics' && (
+                <StatisticsView logs={logs} settings={settings} />
               )}
 
               {activePage === 'students' && role === 'admin' && (

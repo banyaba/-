@@ -138,7 +138,7 @@ export function exportLogsToCSV(logs: UsageLog[], filename: string): void {
     'รายวิชา',
     'รูปแบบการใช้',
     'หมายเหตุ',
-    'ผู้บันทึก',
+    'ครูผู้สอน',
   ];
 
   const escapeCell = (value: string) => {

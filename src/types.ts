@@ -4,6 +4,7 @@ export type PageId =
   | 'dashboard'
   | 'add-data'
   | 'data-table'
+  | 'statistics'
   | 'students'
   | 'subjects'
   | 'reports'
