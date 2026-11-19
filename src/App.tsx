@@ -32,6 +32,7 @@ import {
   type RoomBooking,
   type Student,
   type Subject,
+  type TeachingScheduleSlot,
   type UsageLog,
   type UserRole,
 } from './types';
@@ -202,6 +203,7 @@ export default function App() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [logs, setLogs] = useState<UsageLog[]>([]);
   const [bookings, setBookings] = useState<RoomBooking[]>([]);
+  const [teachingSchedules, setTeachingSchedules] = useState<TeachingScheduleSlot[]>([]);
   const [usageTypes, setUsageTypes] = useState<string[]>([...DEFAULT_USAGE_TYPES]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
@@ -346,6 +348,10 @@ export default function App() {
           onBookings: (nextBookings) => {
             if (!active) return;
             setBookings(nextBookings);
+          },
+          onTeachingSchedules: (nextSchedules) => {
+            if (!active) return;
+            setTeachingSchedules(nextSchedules);
           },
           onError: (err) => {
             if (!active) return;
@@ -975,6 +981,7 @@ export default function App() {
                   activeMode={bookingMode}
                   onModeChange={setBookingMode}
                   bookings={bookings}
+                  teachingSchedules={teachingSchedules}
                   subjects={subjects}
                   settings={settings}
                   defaultManager={settings.labManager}
@@ -988,6 +995,24 @@ export default function App() {
                   }}
                   onBookingDeleted={(id) => {
                     setBookings((prev) => prev.filter((b) => b.id !== id));
+                  }}
+                  onScheduleSaved={(saved) => {
+                    setTeachingSchedules((prev) => {
+                      const idx = prev.findIndex((s) => s.id === saved.id);
+                      if (idx >= 0) {
+                        return prev.map((s) => (s.id === saved.id ? saved : s));
+                      }
+                      return [...prev, saved];
+                    });
+                  }}
+                  onScheduleDeleted={(id) => {
+                    setTeachingSchedules((prev) => prev.filter((s) => s.id !== id));
+                  }}
+                  onSchedulesSeeded={(items) => {
+                    setTeachingSchedules(items);
+                  }}
+                  onScheduleTimesUpdated={(nextScheduleTimes) => {
+                    setSettings((prev) => ({ ...prev, scheduleTimes: nextScheduleTimes }));
                   }}
                   onOpenAdminLogin={() => setAdminModalOpen(true)}
                   onNotify={notify}

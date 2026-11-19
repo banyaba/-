@@ -140,6 +140,70 @@ export const BOOKING_GROUP_OPTIONS: readonly string[] = [
   'หลายชั้นเรียน / กิจกรรมรวม',
 ];
 
+export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+
+export const WEEKDAYS_MON_FRI: readonly { id: DayOfWeek; label: string; short: string }[] = [
+  { id: 'mon', label: 'วันจันทร์', short: 'จ.' },
+  { id: 'tue', label: 'วันอังคาร', short: 'อ.' },
+  { id: 'wed', label: 'วันพุธ', short: 'พ.' },
+  { id: 'thu', label: 'วันพฤหัสบดี', short: 'พฤ.' },
+  { id: 'fri', label: 'วันศุกร์', short: 'ศ.' },
+];
+
+export const TEACHING_PERIODS: readonly {
+  period: number;
+  label: string;
+  startTime: string;
+  endTime: string;
+}[] = [
+  { period: 1, label: 'คาบที่ 1', startTime: '08:30', endTime: '09:30' },
+  { period: 2, label: 'คาบที่ 2', startTime: '09:30', endTime: '10:30' },
+  { period: 3, label: 'คาบที่ 3', startTime: '10:30', endTime: '11:30' },
+  { period: 4, label: 'คาบที่ 4', startTime: '11:30', endTime: '12:30' },
+  { period: 5, label: 'คาบที่ 5', startTime: '13:30', endTime: '14:30' },
+  { period: 6, label: 'คาบที่ 6', startTime: '14:30', endTime: '15:30' },
+];
+
+export interface TeachingScheduleSlot {
+  id: string;
+  computerRoom: string; // คอม1 | คอม2
+  dayOfWeek: DayOfWeek;
+  period: number; // 1..6
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  className: string;
+  subjectName: string;
+  teacherName: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SchedulePeriodConfig {
+  period: number;
+  label: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface LunchBreakConfig {
+  startTime: string;
+  endTime: string;
+}
+
+export interface ScheduleTimeSettings {
+  periods: SchedulePeriodConfig[];
+  lunchBreak: LunchBreakConfig;
+}
+
+export const DEFAULT_SCHEDULE_TIMES: ScheduleTimeSettings = {
+  periods: TEACHING_PERIODS.map((p) => ({ ...p })),
+  lunchBreak: {
+    startTime: '12:30',
+    endTime: '13:30',
+  },
+};
+
 export interface ThemeColors {
   primary: string;
   surface: string;
@@ -153,6 +217,7 @@ export interface AppSettings {
   academicYear: string; // Buddhist Era string e.g. '2569'
   labManager: string;
   colors: ThemeColors;
+  scheduleTimes?: ScheduleTimeSettings;
 }
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
@@ -168,6 +233,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   academicYear: '2569',
   labManager: 'ครูธนากร สุขสวัสดิ์',
   colors: DEFAULT_THEME_COLORS,
+  scheduleTimes: DEFAULT_SCHEDULE_TIMES,
 };
 
 export interface LabDatabase {

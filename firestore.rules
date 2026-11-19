@@ -71,6 +71,10 @@ service cloud.firestore {
       return m is string && m.size() <= 20 && m in ['individual', 'full_room'];
     }
 
+    function isValidDayOfWeek(d) {
+      return d is string && d.size() <= 10 && d in ['mon', 'tue', 'wed', 'thu', 'fri'];
+    }
+
     // --- Validation Blueprints ---
     function isValidStudent(data) {
       return data.keys().hasAll(['number', 'name', 'className', 'ownerId', 'visibility', 'createdAt', 'updatedAt'])
@@ -126,6 +130,28 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidScheduleTimes(st) {
+      return st is map
+        && st.keys().hasAll(['periods', 'lunchBreak'])
+        && st.keys().hasOnly(['periods', 'lunchBreak'])
+        && st.lunchBreak is map
+        && st.lunchBreak.keys().hasAll(['startTime', 'endTime'])
+        && st.lunchBreak.keys().hasOnly(['startTime', 'endTime'])
+        && isValidBookingTime(st.lunchBreak.startTime)
+        && isValidBookingTime(st.lunchBreak.endTime)
+        && st.lunchBreak.endTime > st.lunchBreak.startTime
+        && st.periods is list
+        && st.periods.size() == 6
+        && st.periods[0] is map
+        && st.periods[0].keys().hasAll(['period', 'label', 'startTime', 'endTime'])
+        && st.periods[0].keys().hasOnly(['period', 'label', 'startTime', 'endTime'])
+        && st.periods[0].period is int
+        && st.periods[0].label is string && st.periods[0].label.size() >= 1 && st.periods[0].label.size() <= 40
+        && isValidBookingTime(st.periods[0].startTime)
+        && isValidBookingTime(st.periods[0].endTime)
+        && st.periods[0].endTime > st.periods[0].startTime;
+    }
+
     function isValidLabSettings(data) {
       return data.keys().hasAll([
           'schoolName', 'academicYear', 'labManager', 'colors',
@@ -133,7 +159,7 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'schoolName', 'academicYear', 'labManager', 'colors',
-          'usageTypes', 'ownerId', 'visibility', 'updatedAt'
+          'usageTypes', 'scheduleTimes', 'ownerId', 'visibility', 'updatedAt'
         ])
         && data.schoolName is string && data.schoolName.size() >= 1 && data.schoolName.size() <= 160
         && data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 10
@@ -148,6 +174,7 @@ service cloud.firestore {
         && isValidHexColor(data.colors.secondary)
         && data.usageTypes is list && data.usageTypes.size() <= 50
         && (data.usageTypes.size() == 0 || (data.usageTypes[0] is string && data.usageTypes[0].size() >= 1 && data.usageTypes[0].size() <= 100))
+        && (!('scheduleTimes' in data) || isValidScheduleTimes(data.scheduleTimes))
         && isValidId(data.ownerId)
         && data.visibility is string && data.visibility == 'school' && data.visibility.size() <= 20
         && data.updatedAt is timestamp;
@@ -202,6 +229,33 @@ service cloud.firestore {
         && isValidBookingStatus(data.status)
         && data.decisionNote is string && data.decisionNote.size() <= 300
         && data.decidedBy is string && data.decidedBy.size() <= 120
+        && isValidId(data.ownerId)
+        && data.visibility is string && data.visibility == 'school' && data.visibility.size() <= 20
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTeachingSchedule(data) {
+      return data.keys().hasAll([
+          'computerRoom', 'dayOfWeek', 'period', 'startTime', 'endTime',
+          'className', 'subjectName', 'teacherName', 'note',
+          'ownerId', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'computerRoom', 'dayOfWeek', 'period', 'startTime', 'endTime',
+          'className', 'subjectName', 'teacherName', 'note',
+          'ownerId', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.computerRoom is string && data.computerRoom.size() >= 1 && data.computerRoom.size() <= 32
+        && isValidDayOfWeek(data.dayOfWeek)
+        && data.period is int && data.period >= 1 && data.period <= 8
+        && isValidBookingTime(data.startTime)
+        && isValidBookingTime(data.endTime)
+        && data.endTime > data.startTime
+        && data.className is string && data.className.size() >= 1 && data.className.size() <= 40
+        && data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 120
+        && data.teacherName is string && data.teacherName.size() >= 1 && data.teacherName.size() <= 120
+        && data.note is string && data.note.size() <= 240
         && isValidId(data.ownerId)
         && data.visibility is string && data.visibility == 'school' && data.visibility.size() <= 20
         && data.createdAt is timestamp
@@ -298,7 +352,7 @@ service cloud.firestore {
         && incoming().ownerId == existing().ownerId
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly([
-          'schoolName', 'academicYear', 'labManager', 'colors', 'usageTypes', 'updatedAt'
+          'schoolName', 'academicYear', 'labManager', 'colors', 'usageTypes', 'scheduleTimes', 'updatedAt'
         ]);
       allow delete: if false;
     }
@@ -346,6 +400,29 @@ service cloud.firestore {
           'status', 'decisionNote', 'decidedBy', 'updatedAt'
         ]);
       allow delete: if isValidId(bookingId) && (isAdmin() || (!isSignedIn() && existing().visibility == 'school'));
+    }
+
+    // Weekly Mon-Fri Computer Lab Teaching Schedules (Readable by all; manageable by Admin)
+    match /teachingSchedules/{slotId} {
+      allow get: if isValidId(slotId) && (isAdmin() || existing().visibility == 'school');
+      allow list: if isBootstrappedAdmin() || existing().visibility == 'school';
+      allow create: if isValidId(slotId)
+        && isValidTeachingSchedule(incoming())
+        && (isAdmin() || !isSignedIn())
+        && isValidActorOwnerId(incoming().ownerId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(slotId)
+        && isValidTeachingSchedule(incoming())
+        && (isAdmin() || !isSignedIn())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'computerRoom', 'dayOfWeek', 'period', 'startTime', 'endTime',
+          'className', 'subjectName', 'teacherName', 'note', 'updatedAt'
+        ]);
+      allow delete: if isValidId(slotId) && (isAdmin() || (!isSignedIn() && existing().visibility == 'school'));
     }
   }
 }

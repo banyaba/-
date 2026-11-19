@@ -16,15 +16,20 @@ import {
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import {
+  DEFAULT_SCHEDULE_TIMES,
   DEFAULT_SETTINGS,
   DEFAULT_USAGE_TYPES,
+  TEACHING_PERIODS,
   type AppSettings,
   type BookingMode,
   type BookingStatus,
+  type DayOfWeek,
   type LabDatabase,
   type RoomBooking,
+  type ScheduleTimeSettings,
   type Student,
   type Subject,
+  type TeachingScheduleSlot,
   type UsageLog,
   type UserRole,
 } from '../types';
@@ -164,6 +169,31 @@ function mapBooking(id: string, data: Record<string, unknown>): RoomBooking {
   };
 }
 
+function mapTeachingSchedule(id: string, data: Record<string, unknown>): TeachingScheduleSlot {
+  const rawDay = String(data.dayOfWeek ?? 'mon');
+  const dayOfWeek: DayOfWeek =
+    rawDay === 'tue' || rawDay === 'wed' || rawDay === 'thu' || rawDay === 'fri' ? rawDay : 'mon';
+  return {
+    id,
+    computerRoom: String(data.computerRoom ?? 'คอม1'),
+    dayOfWeek,
+    period: Math.max(1, Math.min(8, Number(data.period || 1))),
+    startTime: String(data.startTime ?? '08:30'),
+    endTime: String(data.endTime ?? '09:30'),
+    className: String(data.className ?? ''),
+    subjectName: String(data.subjectName ?? ''),
+    teacherName: String(data.teacherName ?? ''),
+    note: data.note ? String(data.note) : '',
+    createdAt: toIsoString(data.createdAt),
+    updatedAt: toIsoString(data.updatedAt ?? data.createdAt),
+  };
+}
+
+function makeScheduleDocId(computerRoom: string, dayOfWeek: DayOfWeek, period: number): string {
+  const roomKey = computerRoom === 'คอม1' ? 'r1' : computerRoom === 'คอม2' ? 'r2' : 'rx';
+  return `sch_${roomKey}_${dayOfWeek}_p${period}`;
+}
+
 function findApprovedBookingConflict(
   candidate: {
     id?: string;
@@ -189,6 +219,64 @@ function findApprovedBookingConflict(
   });
 }
 
+function sanitizeScheduleTimes(raw: unknown): ScheduleTimeSettings {
+  const defaults = DEFAULT_SCHEDULE_TIMES;
+  if (!raw || typeof raw !== 'object') {
+    return {
+      periods: defaults.periods.map((p) => ({ ...p })),
+      lunchBreak: { ...defaults.lunchBreak },
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  const rawPeriods = Array.isArray(obj.periods) ? obj.periods : [];
+  const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+  const periods = defaults.periods.map((def, idx) => {
+    const candidate = rawPeriods[idx] as Record<string, unknown> | undefined;
+    const startTime =
+      candidate && typeof candidate.startTime === 'string' && timePattern.test(candidate.startTime)
+        ? candidate.startTime
+        : def.startTime;
+    const endTime =
+      candidate &&
+      typeof candidate.endTime === 'string' &&
+      timePattern.test(candidate.endTime) &&
+      candidate.endTime > startTime
+        ? candidate.endTime
+        : def.endTime;
+    const label =
+      candidate && typeof candidate.label === 'string' && candidate.label.trim()
+        ? candidate.label.trim().slice(0, 40)
+        : def.label;
+    return {
+      period: def.period,
+      label,
+      startTime: endTime > startTime ? startTime : def.startTime,
+      endTime: endTime > startTime ? endTime : def.endTime,
+    };
+  });
+
+  const rawLunch = (obj.lunchBreak as Record<string, unknown> | undefined) || {};
+  const lunchStart =
+    typeof rawLunch.startTime === 'string' && timePattern.test(rawLunch.startTime)
+      ? rawLunch.startTime
+      : defaults.lunchBreak.startTime;
+  const lunchEnd =
+    typeof rawLunch.endTime === 'string' &&
+    timePattern.test(rawLunch.endTime) &&
+    rawLunch.endTime > lunchStart
+      ? rawLunch.endTime
+      : defaults.lunchBreak.endTime;
+
+  return {
+    periods,
+    lunchBreak: {
+      startTime: lunchEnd > lunchStart ? lunchStart : defaults.lunchBreak.startTime,
+      endTime: lunchEnd > lunchStart ? lunchEnd : defaults.lunchBreak.endTime,
+    },
+  };
+}
+
 function mapSettings(data: Record<string, unknown>): {
   settings: AppSettings;
   usageTypes: string[];
@@ -200,6 +288,7 @@ function mapSettings(data: Record<string, unknown>): {
       academicYear: String(data.academicYear || DEFAULT_SETTINGS.academicYear),
       labManager: String(data.labManager || DEFAULT_SETTINGS.labManager),
       colors: sanitizeThemeColors(rawColors),
+      scheduleTimes: sanitizeScheduleTimes(data.scheduleTimes),
     },
     usageTypes: Array.isArray(data.usageTypes)
       ? data.usageTypes.map(String)
@@ -415,6 +504,7 @@ export interface LabSubscriptionsCallbacks {
   onSubjects: (subjects: Subject[]) => void;
   onLogs: (logs: UsageLog[]) => void;
   onBookings?: (bookings: RoomBooking[]) => void;
+  onTeachingSchedules?: (schedules: TeachingScheduleSlot[]) => void;
   onSettings: (settings: AppSettings, usageTypes: string[]) => void;
   onError: (err: Error) => void;
 }
@@ -513,12 +603,45 @@ export function subscribeLabDatabase(callbacks: LabSubscriptionsCallbacks): Unsu
       )
     : () => {};
 
+  const unsubSchedules = callbacks.onTeachingSchedules
+    ? onSnapshot(
+        query(collection(db, 'teachingSchedules'), where('visibility', '==', 'school')),
+        (snap) => {
+          const dayOrder: Record<DayOfWeek, number> = {
+            mon: 1,
+            tue: 2,
+            wed: 3,
+            thu: 4,
+            fri: 5,
+          };
+          const items = snap.docs
+            .map((d) => mapTeachingSchedule(d.id, d.data() as Record<string, unknown>))
+            .sort((a, b) => {
+              const roomDiff = a.computerRoom.localeCompare(b.computerRoom, 'th');
+              if (roomDiff !== 0) return roomDiff;
+              const dayDiff = dayOrder[a.dayOfWeek] - dayOrder[b.dayOfWeek];
+              if (dayDiff !== 0) return dayDiff;
+              return a.period - b.period;
+            });
+          callbacks.onTeachingSchedules?.(items);
+        },
+        (err) => {
+          try {
+            handleFirestoreError(err, OperationType.LIST, 'teachingSchedules');
+          } catch (wrapped) {
+            callbacks.onError(wrapped as Error);
+          }
+        }
+      )
+    : () => {};
+
   return () => {
     unsubSettings();
     unsubStudents();
     unsubSubjects();
     unsubLogs();
     unsubBookings();
+    unsubSchedules();
   };
 }
 
@@ -1108,6 +1231,10 @@ export const firestoreApi = {
     try {
       const ref = doc(db, 'settings', 'app');
       const snap = await getDoc(ref);
+      const existingScheduleTimes = snap.exists()
+        ? sanitizeScheduleTimes(snap.data().scheduleTimes)
+        : sanitizeScheduleTimes(payload.scheduleTimes);
+
       if (snap.exists()) {
         await updateDoc(ref, {
           schoolName,
@@ -1123,12 +1250,84 @@ export const firestoreApi = {
           labManager,
           colors,
           usageTypes: [...DEFAULT_USAGE_TYPES],
+          scheduleTimes: existingScheduleTimes,
           ownerId: uid,
           visibility: 'school',
           updatedAt: serverTimestamp(),
         });
       }
-      return { schoolName, academicYear, labManager, colors };
+      return {
+        schoolName,
+        academicYear,
+        labManager,
+        colors,
+        scheduleTimes: existingScheduleTimes,
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    }
+  },
+
+  updateScheduleTimes: async (
+    payload: ScheduleTimeSettings,
+    role: UserRole
+  ): Promise<ScheduleTimeSettings> => {
+    const uid = getActorUid();
+    if (role !== 'admin') {
+      throw new Error('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์แก้ไขเวลาคาบสอนและพักกลางวัน');
+    }
+
+    if (!payload || !Array.isArray(payload.periods) || payload.periods.length !== 6) {
+      throw new Error('ข้อมูลคาบสอนต้องมีครบทั้ง 6 คาบ');
+    }
+
+    const validatedPeriods = payload.periods.map((p, idx) => {
+      const range = assertValidBookingTimeRange(p.startTime, p.endTime);
+      const label = clampString(p.label, 40) || `คาบที่ ${idx + 1}`;
+      return {
+        period: idx + 1,
+        label,
+        startTime: range.startTime,
+        endTime: range.endTime,
+      };
+    });
+
+    const lunchRange = assertValidBookingTimeRange(
+      payload.lunchBreak?.startTime || '',
+      payload.lunchBreak?.endTime || ''
+    );
+
+    const nextScheduleTimes: ScheduleTimeSettings = {
+      periods: validatedPeriods,
+      lunchBreak: {
+        startTime: lunchRange.startTime,
+        endTime: lunchRange.endTime,
+      },
+    };
+
+    const path = 'settings/app';
+    try {
+      const ref = doc(db, 'settings', 'app');
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        await updateDoc(ref, {
+          scheduleTimes: nextScheduleTimes,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await setDoc(ref, {
+          schoolName: DEFAULT_SETTINGS.schoolName,
+          academicYear: DEFAULT_SETTINGS.academicYear,
+          labManager: DEFAULT_SETTINGS.labManager,
+          colors: sanitizeThemeColors(),
+          usageTypes: [...DEFAULT_USAGE_TYPES],
+          scheduleTimes: nextScheduleTimes,
+          ownerId: uid,
+          visibility: 'school',
+          updatedAt: serverTimestamp(),
+        });
+      }
+      return nextScheduleTimes;
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
     }
@@ -1387,6 +1586,193 @@ export const firestoreApi = {
       return { ok: true };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `bookings/${safeId}`);
+    }
+  },
+
+  upsertTeachingScheduleSlot: async (
+    payload: {
+      computerRoom: string;
+      dayOfWeek: DayOfWeek;
+      period: number;
+      startTime: string;
+      endTime: string;
+      className: string;
+      subjectName: string;
+      teacherName: string;
+      note?: string;
+    },
+    role: UserRole
+  ): Promise<TeachingScheduleSlot> => {
+    const uid = getActorUid();
+    if (role !== 'admin') {
+      throw new Error('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์จัดการตารางคาบสอน');
+    }
+    const computerRoom = clampString(payload.computerRoom, LIMITS.ROOM_MAX);
+    const dayOfWeek: DayOfWeek =
+      payload.dayOfWeek === 'tue' ||
+      payload.dayOfWeek === 'wed' ||
+      payload.dayOfWeek === 'thu' ||
+      payload.dayOfWeek === 'fri'
+        ? payload.dayOfWeek
+        : 'mon';
+    const period = Math.max(1, Math.min(8, Math.round(Number(payload.period) || 1)));
+    const { startTime, endTime } = assertValidBookingTimeRange(payload.startTime, payload.endTime);
+    const className = clampString(payload.className, LIMITS.BOOKING_CLASS_MAX);
+    const subjectName = clampString(payload.subjectName, LIMITS.NAME_MAX);
+    const teacherName = clampString(payload.teacherName, LIMITS.NAME_MAX);
+    const note = clampString(payload.note, LIMITS.SUBJECT_NOTE_MAX);
+
+    if (!computerRoom || !className || !subjectName || !teacherName) {
+      throw new Error('กรุณากรอกข้อมูลคาบสอน (ห้อง ชั้นเรียน วิชา และครูผู้สอน) ให้ครบถ้วน');
+    }
+
+    const id = makeScheduleDocId(computerRoom, dayOfWeek, period);
+    const path = `teachingSchedules/${id}`;
+    const nowIso = new Date().toISOString();
+
+    try {
+      const ref = doc(db, 'teachingSchedules', id);
+      const existingSnap = await getDoc(ref);
+      if (existingSnap.exists()) {
+        await updateDoc(ref, {
+          computerRoom,
+          dayOfWeek,
+          period,
+          startTime,
+          endTime,
+          className,
+          subjectName,
+          teacherName,
+          note,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await setDoc(ref, {
+          computerRoom,
+          dayOfWeek,
+          period,
+          startTime,
+          endTime,
+          className,
+          subjectName,
+          teacherName,
+          note,
+          ownerId: uid,
+          visibility: 'school',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      return {
+        id,
+        computerRoom,
+        dayOfWeek,
+        period,
+        startTime,
+        endTime,
+        className,
+        subjectName,
+        teacherName,
+        note,
+        createdAt: existingSnap.exists()
+          ? toIsoString(existingSnap.data().createdAt)
+          : nowIso,
+        updatedAt: nowIso,
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, path);
+    }
+  },
+
+  deleteTeachingScheduleSlot: async (id: string, role: UserRole): Promise<{ ok: boolean }> => {
+    getActorUid();
+    if (role !== 'admin') {
+      throw new Error('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์ลบคาบสอน');
+    }
+    const safeId = sanitizeId(id);
+    if (!safeId) throw new Error('รหัสคาบสอนไม่ถูกต้อง');
+    try {
+      await deleteDoc(doc(db, 'teachingSchedules', safeId));
+      return { ok: true };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `teachingSchedules/${safeId}`);
+    }
+  },
+
+  seedDefaultTeachingSchedules: async (
+    defaultTeacher: string,
+    role: UserRole
+  ): Promise<TeachingScheduleSlot[]> => {
+    const uid = getActorUid();
+    if (role !== 'admin') {
+      throw new Error('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์สร้างตัวอย่างตารางคาบสอน');
+    }
+    const teacher = clampString(defaultTeacher, LIMITS.NAME_MAX) || 'ครูธนากร สุขสวัสดิ์';
+    const sampleDefs: Array<{
+      computerRoom: string;
+      dayOfWeek: DayOfWeek;
+      period: number;
+      className: string;
+      subjectName: string;
+      teacherName: string;
+    }> = [
+      { computerRoom: 'คอม1', dayOfWeek: 'mon', period: 1, className: 'ป.4/1', subjectName: 'วิทยาการคำนวณ', teacherName: teacher },
+      { computerRoom: 'คอม1', dayOfWeek: 'mon', period: 2, className: 'ป.4/2', subjectName: 'วิทยาการคำนวณ', teacherName: teacher },
+      { computerRoom: 'คอม1', dayOfWeek: 'tue', period: 1, className: 'ป.5/1', subjectName: 'เทคโนโลยีสารสนเทศ', teacherName: teacher },
+      { computerRoom: 'คอม1', dayOfWeek: 'tue', period: 4, className: 'ป.5/2', subjectName: 'เทคโนโลยีสารสนเทศ', teacherName: teacher },
+      { computerRoom: 'คอม1', dayOfWeek: 'wed', period: 2, className: 'ป.6/1', subjectName: 'วิทยาการคำนวณ', teacherName: teacher },
+      { computerRoom: 'คอม1', dayOfWeek: 'thu', period: 1, className: 'ป.3/1', subjectName: 'วิทยาการคำนวณ', teacherName: teacher },
+      { computerRoom: 'คอม1', dayOfWeek: 'fri', period: 2, className: 'ป.6/2', subjectName: 'โครงงานคอมพิวเตอร์', teacherName: teacher },
+      { computerRoom: 'คอม2', dayOfWeek: 'mon', period: 4, className: 'ป.1/1', subjectName: 'ฝึกพิมพ์และสื่อการเรียน', teacherName: 'ครูศิริพร แก้วมณี' },
+      { computerRoom: 'คอม2', dayOfWeek: 'tue', period: 2, className: 'ป.2/1', subjectName: 'วิทยาการคำนวณ', teacherName: 'ครูศิริพร แก้วมณี' },
+      { computerRoom: 'คอม2', dayOfWeek: 'wed', period: 4, className: 'ป.3/2', subjectName: 'เทคโนโลยีสารสนเทศ', teacherName: 'ครูศิริพร แก้วมณี' },
+      { computerRoom: 'คอม2', dayOfWeek: 'thu', period: 2, className: 'ป.4/3', subjectName: 'วิทยาศาสตร์', teacherName: 'ครูศิริพร แก้วมณี' },
+      { computerRoom: 'คอม2', dayOfWeek: 'fri', period: 4, className: 'ป.5/3', subjectName: 'ภาษาอังกฤษ', teacherName: 'ครูศิริพร แก้วมณี' },
+    ];
+
+    const nowIso = new Date().toISOString();
+    const created: TeachingScheduleSlot[] = [];
+
+    try {
+      const batch = writeBatch(db);
+      for (const def of sampleDefs) {
+        const periodCfg = TEACHING_PERIODS.find((p) => p.period === def.period) || TEACHING_PERIODS[0];
+        const id = makeScheduleDocId(def.computerRoom, def.dayOfWeek, def.period);
+        batch.set(doc(db, 'teachingSchedules', id), {
+          computerRoom: def.computerRoom,
+          dayOfWeek: def.dayOfWeek,
+          period: def.period,
+          startTime: periodCfg.startTime,
+          endTime: periodCfg.endTime,
+          className: def.className,
+          subjectName: def.subjectName,
+          teacherName: def.teacherName,
+          note: '',
+          ownerId: uid,
+          visibility: 'school',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        created.push({
+          id,
+          computerRoom: def.computerRoom,
+          dayOfWeek: def.dayOfWeek,
+          period: def.period,
+          startTime: periodCfg.startTime,
+          endTime: periodCfg.endTime,
+          className: def.className,
+          subjectName: def.subjectName,
+          teacherName: def.teacherName,
+          note: '',
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        });
+      }
+      await batch.commit();
+      return created;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'teachingSchedules');
     }
   },
 };

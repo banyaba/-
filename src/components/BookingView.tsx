@@ -14,47 +14,49 @@ import {
   XCircle,
   AlertTriangle,
   FileBarChart2,
+  CalendarDays,
 } from 'lucide-react';
 import {
   BOOKING_GROUP_OPTIONS,
   CLASS_LIST,
   COMPUTER_ROOMS,
   COMPUTER_STATIONS,
+  DEFAULT_SCHEDULE_TIMES,
   EXTERNAL_VISITOR_CLASS,
   type AppSettings,
   type BookingMode,
   type BookingStatus,
   type RoomBooking,
+  type ScheduleTimeSettings,
   type Subject,
+  type TeachingScheduleSlot,
   type UserRole,
 } from '../types';
 import { formatBuddhistISO, formatThaiFullDate, getTodayISO } from '../utils/thaiDate';
 import { api } from '../api/client';
 import { ConfirmModal } from './ConfirmModal';
 import { BookingReportPanel } from './BookingReportPanel';
+import { TeachingSchedulePanel } from './TeachingSchedulePanel';
 
 interface BookingViewProps {
   role: UserRole;
   activeMode: BookingMode;
   onModeChange: (mode: BookingMode) => void;
   bookings: RoomBooking[];
+  teachingSchedules: TeachingScheduleSlot[];
   subjects: Subject[];
   settings: AppSettings;
   defaultManager: string;
   onBookingCreated: (booking: RoomBooking) => void;
   onBookingUpdated: (booking: RoomBooking) => void;
   onBookingDeleted: (bookingId: string) => void;
+  onScheduleSaved: (slot: TeachingScheduleSlot) => void;
+  onScheduleDeleted: (id: string) => void;
+  onSchedulesSeeded: (items: TeachingScheduleSlot[]) => void;
+  onScheduleTimesUpdated: (next: ScheduleTimeSettings) => void;
   onOpenAdminLogin: () => void;
   onNotify: (type: 'success' | 'error', message: string) => void;
 }
-
-const TIME_PRESETS: readonly { label: string; start: string; end: string }[] = [
-  { label: 'คาบ 1 (08:30–09:30)', start: '08:30', end: '09:30' },
-  { label: 'คาบ 2 (09:30–10:30)', start: '09:30', end: '10:30' },
-  { label: 'คาบ 3 (10:30–11:30)', start: '10:30', end: '11:30' },
-  { label: 'คาบ 4 (13:00–14:00)', start: '13:00', end: '14:00' },
-  { label: 'คาบ 5 (14:00–15:00)', start: '14:00', end: '15:00' },
-];
 
 const INDIVIDUAL_GROUP_OPTIONS: readonly string[] = [
   ...CLASS_LIST,
@@ -66,18 +68,38 @@ export function BookingView({
   activeMode,
   onModeChange,
   bookings,
+  teachingSchedules,
   subjects,
   settings,
   defaultManager,
   onBookingCreated,
   onBookingUpdated,
   onBookingDeleted,
+  onScheduleSaved,
+  onScheduleDeleted,
+  onSchedulesSeeded,
+  onScheduleTimesUpdated,
   onOpenAdminLogin,
   onNotify,
 }: BookingViewProps) {
-  const [showReportTab, setShowReportTab] = useState(false);
-  const effectiveTab: 'individual' | 'full_room' | 'report' =
-    role === 'admin' && showReportTab ? 'report' : activeMode;
+  const [extraTab, setExtraTab] = useState<'none' | 'schedule' | 'report'>('none');
+  const effectiveTab: 'individual' | 'full_room' | 'schedule' | 'report' =
+    extraTab === 'report'
+      ? role === 'admin'
+        ? 'report'
+        : activeMode
+      : extraTab === 'schedule'
+      ? 'schedule'
+      : activeMode;
+
+  const timePresets = useMemo(() => {
+    const periods = settings.scheduleTimes?.periods || DEFAULT_SCHEDULE_TIMES.periods;
+    return periods.map((p) => ({
+      label: `คาบ ${p.period} (${p.startTime}–${p.endTime})`,
+      start: p.startTime,
+      end: p.endTime,
+    }));
+  }, [settings.scheduleTimes]);
 
   // Shared Date / Time / Room State
   const [date, setDate] = useState(getTodayISO());
@@ -398,13 +420,13 @@ export function BookingView({
 
   return (
     <div className="space-y-6">
-      {/* Sub-menu Segmented Bar: รายคน | เครื่องทั้งห้อง | รายงานการจอง (Admin only) */}
+      {/* Sub-menu Segmented Bar: รายคน | เครื่องทั้งห้อง | ตารางคาบสอน | รายงานการจอง (Admin only) */}
       <div className="no-print flex flex-wrap items-center justify-between gap-4">
         <div className="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 bg-gradient-to-r from-sky-50/90 via-emerald-50/80 to-teal-50/90 dark:from-slate-900 dark:to-emerald-950/40 p-1.5">
           <button
             type="button"
             onClick={() => {
-              setShowReportTab(false);
+              setExtraTab('none');
               onModeChange('individual');
             }}
             className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
@@ -420,7 +442,7 @@ export function BookingView({
           <button
             type="button"
             onClick={() => {
-              setShowReportTab(false);
+              setExtraTab('none');
               onModeChange('full_room');
             }}
             className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
@@ -433,10 +455,23 @@ export function BookingView({
             <span>เครื่องทั้งห้อง</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => setExtraTab('schedule')}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
+              effectiveTab === 'schedule'
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/70 hover:text-indigo-700 dark:hover:text-indigo-300'
+            }`}
+          >
+            <CalendarDays className="h-4 w-4" />
+            <span>ตารางคาบสอน</span>
+          </button>
+
           {role === 'admin' && (
             <button
               type="button"
-              onClick={() => setShowReportTab(true)}
+              onClick={() => setExtraTab('report')}
               className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap shrink-0 ${
                 effectiveTab === 'report'
                   ? 'bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-sm'
@@ -452,6 +487,8 @@ export function BookingView({
         <span className="text-xs text-slate-500 dark:text-slate-400">
           {effectiveTab === 'report'
             ? 'สรุปรายงานและพิมพ์เอกสารการจองห้องคอมพิวเตอร์ (สำหรับผู้ดูแลระบบ)'
+            : effectiveTab === 'schedule'
+            ? 'ตารางคาบสอนประจำวันจันทร์ – ศุกร์ ห้องคอม 1 และ ห้องคอม 2'
             : effectiveTab === 'individual'
             ? 'เลือกจองเฉพาะเครื่องคอมพิวเตอร์รายบุคคล (1 เครื่อง)'
             : 'จองเครื่องทั้งห้องสำหรับการสอน อบรม หรือกิจกรรมกลุ่ม'}
@@ -460,6 +497,25 @@ export function BookingView({
 
       {effectiveTab === 'report' ? (
         <BookingReportPanel bookings={bookings} settings={settings} onNotify={onNotify} />
+      ) : effectiveTab === 'schedule' ? (
+        <TeachingSchedulePanel
+          role={role}
+          schedules={teachingSchedules}
+          subjects={subjects}
+          settings={settings}
+          onScheduleSaved={onScheduleSaved}
+          onScheduleDeleted={onScheduleDeleted}
+          onSchedulesSeeded={onSchedulesSeeded}
+          onScheduleTimesUpdated={onScheduleTimesUpdated}
+          onQuickBookRoom={(room, sTime, eTime) => {
+            setComputerRoom(room);
+            setStartTime(sTime);
+            setEndTime(eTime);
+            setExtraTab('none');
+            onModeChange('full_room');
+          }}
+          onNotify={onNotify}
+        />
       ) : (
         <>
           {/* 4 Summary KPI Cards */}
@@ -548,7 +604,7 @@ export function BookingView({
                   เลือกช่วงเวลาด่วนตามคาบเรียน
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  {TIME_PRESETS.map((preset) => {
+                  {timePresets.map((preset) => {
                     const active = startTime === preset.start && endTime === preset.end;
                     return (
                       <button
@@ -834,7 +890,7 @@ export function BookingView({
                   เลือกช่วงเวลาด่วนตามคาบเรียน
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  {TIME_PRESETS.map((preset) => {
+                  {timePresets.map((preset) => {
                     const active = startTime === preset.start && endTime === preset.end;
                     return (
                       <button

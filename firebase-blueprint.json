@@ -240,6 +240,10 @@
           "type": "array",
           "description": "Configurable usage activity options (max 50)."
         },
+        "scheduleTimes": {
+          "type": "object",
+          "description": "Configurable time ranges for teaching periods 1-6 and lunch break."
+        },
         "ownerId": {
           "type": "string",
           "minLength": 1,
@@ -452,6 +456,104 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "TeachingSchedule": {
+      "title": "TeachingSchedule",
+      "description": "Weekly Monday-Friday regular teaching period slot for computer rooms 1 and 2.",
+      "type": "object",
+      "properties": {
+        "computerRoom": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "Computer room name (คอม1 or คอม2)."
+        },
+        "dayOfWeek": {
+          "type": "string",
+          "enum": ["mon", "tue", "wed", "thu", "fri"],
+          "maxLength": 10,
+          "description": "Weekday identifier (mon to fri)."
+        },
+        "period": {
+          "type": "integer",
+          "description": "Teaching period number (1-8)."
+        },
+        "startTime": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 5,
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "description": "Period start time (HH:mm)."
+        },
+        "endTime": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 5,
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "description": "Period end time (HH:mm)."
+        },
+        "className": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "Classroom or student group name."
+        },
+        "subjectName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Subject or course taught."
+        },
+        "teacherName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Assigned teacher name."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 240,
+          "description": "Optional teaching note."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the admin who created the slot."
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["school"],
+          "maxLength": 20,
+          "description": "Shared school visibility scope."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp."
+        }
+      },
+      "required": [
+        "computerRoom",
+        "dayOfWeek",
+        "period",
+        "startTime",
+        "endTime",
+        "className",
+        "subjectName",
+        "teacherName",
+        "note",
+        "ownerId",
+        "visibility",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -482,6 +584,10 @@
     "/bookings/{bookingId}": {
       "schema": { "$ref": "#/entities/RoomBooking" },
       "description": "Computer lab room bookings with admin-only approval status."
+    },
+    "/teachingSchedules/{slotId}": {
+      "schema": { "$ref": "#/entities/TeachingSchedule" },
+      "description": "Weekly Monday-Friday teaching timetable for computer rooms 1 and 2."
     }
   }
 }
