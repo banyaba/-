@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Sparkles,
   Trash2,
+  User,
   X,
 } from 'lucide-react';
 import {
@@ -303,10 +304,10 @@ export function TeachingSchedulePanel({
                 ? () => openSlotModal(room, day, periodCfg.period, slot)
                 : undefined
             }
-            className={`group relative rounded-lg p-2.5 h-full min-h-[78px] border transition-all ${
+            className={`group relative rounded-lg p-2.5 h-full min-h-[82px] border transition-all ${
               isRoom1
-                ? 'border-sky-200/90 dark:border-sky-800/70 bg-gradient-to-br from-sky-50/90 to-blue-50/50 dark:from-sky-950/50 dark:to-blue-950/30'
-                : 'border-emerald-200/90 dark:border-emerald-800/70 bg-gradient-to-br from-emerald-50/90 to-teal-50/50 dark:from-emerald-950/50 dark:to-teal-950/30'
+                ? 'border-sky-200 dark:border-sky-800/70 bg-white dark:bg-slate-900/90'
+                : 'border-emerald-200 dark:border-emerald-800/70 bg-white dark:bg-slate-900/90'
             } ${role === 'admin' ? 'cursor-pointer hover:shadow-xs' : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
@@ -323,14 +324,26 @@ export function TeachingSchedulePanel({
                 <Pencil className="no-print h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
               )}
             </div>
-            <div className="mt-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">
-              {slot.subjectName}
+            <div
+              className="mt-1.5 flex items-start gap-1.5 text-indigo-700 dark:text-indigo-300"
+              title={`รายวิชา: ${slot.subjectName}`}
+            >
+              <BookOpen className="h-3.5 w-3.5 shrink-0 mt-0.5 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-xs font-semibold leading-snug line-clamp-2">
+                {slot.subjectName}
+              </span>
             </div>
-            <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300 truncate">
-              {slot.teacherName}
+            <div
+              className="mt-1.5 pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 text-orange-700 dark:text-orange-300"
+              title={`ครูผู้สอน: ${slot.teacherName}`}
+            >
+              <User className="h-3.5 w-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
+              <span className="text-[11px] font-medium truncate">
+                {slot.teacherName}
+              </span>
             </div>
             {(slot.startTime !== periodCfg.startTime || slot.endTime !== periodCfg.endTime) && (
-              <div className="mt-0.5 font-mono-num text-[10px] text-slate-500 dark:text-slate-400">
+              <div className="mt-1 font-mono-num text-[10px] text-slate-500 dark:text-slate-400">
                 {slot.startTime}–{slot.endTime}
               </div>
             )}
@@ -502,7 +515,23 @@ export function TeachingSchedulePanel({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 text-[11px]">
+                    <span className="inline-flex items-center gap-1 font-semibold text-indigo-700 dark:text-indigo-300">
+                      <BookOpen className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>วิชาที่สอน</span>
+                    </span>
+                    <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">
+                      /
+                    </span>
+                    <span className="inline-flex items-center gap-1 font-semibold text-orange-700 dark:text-orange-300">
+                      <User className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                      <span>ครูผู้สอน</span>
+                    </span>
+                  </div>
+                  <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">
+                    |
+                  </span>
                   <span className="font-mono-num font-semibold text-slate-700 dark:text-slate-200">
                     มีคาบสอน {roomCount} คาบ
                   </span>
