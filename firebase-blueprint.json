@@ -17,9 +17,8 @@
         },
         "className": {
           "type": "string",
-          "minLength": 2,
-          "maxLength": 20,
-          "pattern": "^ป\\.[1-6]/[1-3]$",
+          "minLength": 1,
+          "maxLength": 32,
           "description": "Classroom identifier (e.g. ป.5/1)."
         },
         "ownerId": {
@@ -135,10 +134,9 @@
         },
         "className": {
           "type": "string",
-          "minLength": 2,
-          "maxLength": 20,
-          "pattern": "^(ป\\.[1-6]/[1-3]|บุคคลภายนอก)$",
-          "description": "Classroom identifier (ป.1/1 - ป.6/3) or external visitor label (บุคคลภายนอก)."
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "Classroom identifier or external visitor label (บุคคลภายนอก)."
         },
         "subjectId": {
           "type": "string",
@@ -247,6 +245,14 @@
         "scheduleTimes": {
           "type": "object",
           "description": "Configurable time ranges for teaching periods 1-6 and lunch break."
+        },
+        "classList": {
+          "type": "array",
+          "description": "Configurable list of classrooms (1-60 names)."
+        },
+        "computerRooms": {
+          "type": "array",
+          "description": "Configurable list of computer lab rooms (1-20 names)."
         },
         "ownerId": {
           "type": "string",
@@ -567,7 +573,7 @@
   "firestore": {
     "/students/{studentId}": {
       "schema": { "$ref": "#/entities/Student" },
-      "description": "Roster of students across classes ป.1/1 - ป.6/3."
+      "description": "Roster of students across configured classes."
     },
     "/subjects/{subjectId}": {
       "schema": { "$ref": "#/entities/Subject" },

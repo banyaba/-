@@ -10,7 +10,7 @@ import {
   Layers,
 } from 'lucide-react';
 import {
-  COMPUTER_ROOMS,
+  getActiveComputerRooms,
   THAI_MONTHS,
   type AppSettings,
   type BookingMode,
@@ -94,6 +94,14 @@ export function BookingReportPanel({
   settings,
   onNotify,
 }: BookingReportPanelProps) {
+  const activeRooms = useMemo(() => getActiveComputerRooms(settings), [settings]);
+  const allKnownRooms = useMemo(
+    () =>
+      Array.from(
+        new Set([...activeRooms, ...bookings.map((b) => b.computerRoom).filter(Boolean)])
+      ),
+    [activeRooms, bookings]
+  );
   const now = new Date();
   const defaultBeYear = Number(settings.academicYear) || now.getFullYear() + 543;
 
@@ -159,7 +167,15 @@ export function BookingReportPanel({
   }, [filteredBookings]);
 
   const roomBreakdown = useMemo(() => {
-    const rooms = criteria.roomFilter === 'all' ? [...COMPUTER_ROOMS] : [criteria.roomFilter];
+    const rooms =
+      criteria.roomFilter === 'all'
+        ? Array.from(
+            new Set([
+              ...activeRooms,
+              ...filteredBookings.map((b) => b.computerRoom).filter(Boolean),
+            ])
+          )
+        : [criteria.roomFilter];
     return rooms.map((room) => {
       const items = filteredBookings.filter((b) => b.computerRoom === room);
       const individual = items.filter((b) => b.bookingMode === 'individual').length;
@@ -177,7 +193,7 @@ export function BookingReportPanel({
         rejected,
       };
     });
-  }, [filteredBookings, criteria.roomFilter]);
+  }, [filteredBookings, criteria.roomFilter, activeRooms]);
 
   const reportTitle = useMemo(() => {
     if (criteria.type === 'all') {
@@ -557,7 +573,7 @@ export function BookingReportPanel({
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
               >
                 <option value="all">ทุกห้อง</option>
-                {COMPUTER_ROOMS.map((r) => (
+                {allKnownRooms.map((r) => (
                   <option key={r} value={r}>
                     ห้อง {r}
                   </option>

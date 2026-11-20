@@ -13,8 +13,6 @@ import {
   Plus,
 } from 'lucide-react';
 import {
-  CLASS_LIST,
-  COMPUTER_ROOMS,
   COMPUTER_STATIONS,
   EXTERNAL_VISITOR_CATEGORIES,
   EXTERNAL_VISITOR_CLASS,
@@ -31,6 +29,8 @@ interface AddDataViewProps {
   role: UserRole;
   students: Student[];
   subjects: Subject[];
+  classList: string[];
+  computerRooms: string[];
   usageTypes: string[];
   defaultRecorder: string;
   labManagers?: string[];
@@ -46,6 +46,8 @@ export function AddDataView({
   role,
   students,
   subjects,
+  classList,
+  computerRooms,
   usageTypes,
   defaultRecorder,
   labManagers,
@@ -81,13 +83,13 @@ export function AddDataView({
   }, [students]);
 
   const defaultPopulatedClass = useMemo(() => {
-    return CLASS_LIST.find((cls) => (studentCountByClass[cls] || 0) > 0) || CLASS_LIST[0];
-  }, [studentCountByClass]);
+    return classList.find((cls) => (studentCountByClass[cls] || 0) > 0) || classList[0] || '';
+  }, [classList, studentCountByClass]);
 
   // Individual Tab State
   const [indDate, setIndDate] = useState(getTodayISO());
   const [indTimeIn, setIndTimeIn] = useState(getCurrentTimeHHMM());
-  const [indComputerRoom, setIndComputerRoom] = useState(COMPUTER_ROOMS[0]);
+  const [indComputerRoom, setIndComputerRoom] = useState(() => computerRooms[0] || '');
   const [indComputerNumber, setIndComputerNumber] = useState('1');
   const [indClass, setIndClass] = useState(() => defaultPopulatedClass);
   const [indStudentName, setIndStudentName] = useState('');
@@ -103,7 +105,7 @@ export function AddDataView({
   // Batch Tab State
   const [batchDate, setBatchDate] = useState(getTodayISO());
   const [batchTimeIn, setBatchTimeIn] = useState(getCurrentTimeHHMM());
-  const [batchComputerRoom, setBatchComputerRoom] = useState(COMPUTER_ROOMS[0]);
+  const [batchComputerRoom, setBatchComputerRoom] = useState(() => computerRooms[0] || '');
   const [batchClass, setBatchClass] = useState(() => defaultPopulatedClass);
   const [batchSubjectName, setBatchSubjectName] = useState('');
   const [batchRecorder, setBatchRecorder] = useState(defaultRecorder);
@@ -118,7 +120,7 @@ export function AddDataView({
   // External Visitor Tab State (แท็บ 3: บุคคลภายนอก)
   const [extDate, setExtDate] = useState(getTodayISO());
   const [extTimeIn, setExtTimeIn] = useState(getCurrentTimeHHMM());
-  const [extComputerRoom, setExtComputerRoom] = useState(COMPUTER_ROOMS[0]);
+  const [extComputerRoom, setExtComputerRoom] = useState(() => computerRooms[0] || '');
   const [extComputerNumber, setExtComputerNumber] = useState('1');
   const [extVisitorName, setExtVisitorName] = useState('');
   const [extCategory, setExtCategory] = useState(EXTERNAL_VISITOR_CATEGORIES[0]);
@@ -139,6 +141,30 @@ export function AddDataView({
     }
   }, [subjects, indSubjectName, batchSubjectName]);
 
+  // Keep selected class & computer room synced if settings change
+  useEffect(() => {
+    if (editingLog) return;
+    if (classList.length > 0) {
+      if (!classList.includes(indClass)) setIndClass(defaultPopulatedClass || classList[0]);
+      if (!classList.includes(batchClass)) setBatchClass(defaultPopulatedClass || classList[0]);
+    }
+    if (computerRooms.length > 0) {
+      if (!computerRooms.includes(indComputerRoom)) setIndComputerRoom(computerRooms[0]);
+      if (!computerRooms.includes(batchComputerRoom)) setBatchComputerRoom(computerRooms[0]);
+      if (!computerRooms.includes(extComputerRoom)) setExtComputerRoom(computerRooms[0]);
+    }
+  }, [
+    classList,
+    computerRooms,
+    defaultPopulatedClass,
+    indClass,
+    batchClass,
+    indComputerRoom,
+    batchComputerRoom,
+    extComputerRoom,
+    editingLog,
+  ]);
+
   // Populate Individual or External Tab when editingLog changes
   useEffect(() => {
     if (editingLog) {
@@ -146,7 +172,7 @@ export function AddDataView({
         setActiveTab('external');
         setExtDate(editingLog.date);
         setExtTimeIn(editingLog.timeIn || '');
-        setExtComputerRoom(editingLog.computerRoom || COMPUTER_ROOMS[0]);
+        setExtComputerRoom(editingLog.computerRoom || computerRooms[0] || '');
         setExtComputerNumber(editingLog.computerNumber || '');
         setExtVisitorName(editingLog.studentName);
         if (EXTERNAL_VISITOR_CATEGORIES.includes(editingLog.subjectName)) {
@@ -165,7 +191,7 @@ export function AddDataView({
       setActiveTab('individual');
       setIndDate(editingLog.date);
       setIndTimeIn(editingLog.timeIn || '');
-      setIndComputerRoom(editingLog.computerRoom || COMPUTER_ROOMS[0]);
+      setIndComputerRoom(editingLog.computerRoom || computerRooms[0] || '');
       setIndComputerNumber(editingLog.computerNumber || '');
       setIndClass(editingLog.className);
       setIndStudentName(editingLog.studentName);
@@ -179,7 +205,7 @@ export function AddDataView({
       setIndNote(editingLog.note || '');
       setIndRecorder(editingLog.recorder);
     }
-  }, [editingLog, students]);
+  }, [editingLog, students, computerRooms]);
 
   const classStudents = useMemo(
     () =>
@@ -629,7 +655,13 @@ export function AddDataView({
                   onChange={(e) => setIndComputerRoom(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {COMPUTER_ROOMS.map((room) => (
+                  {Array.from(
+                    new Set(
+                      editingLog?.computerRoom
+                        ? [...computerRooms, editingLog.computerRoom]
+                        : computerRooms
+                    )
+                  ).map((room) => (
                     <option key={room} value={room}>
                       {room}
                     </option>
@@ -668,7 +700,13 @@ export function AddDataView({
                 onChange={(e) => setIndClass(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {CLASS_LIST.map((cls) => {
+                {Array.from(
+                  new Set(
+                    editingLog?.className && editingLog.className !== EXTERNAL_VISITOR_CLASS
+                      ? [...classList, editingLog.className]
+                      : classList
+                  )
+                ).map((cls) => {
                   const count = studentCountByClass[cls] || 0;
                   return (
                     <option key={cls} value={cls}>
@@ -1006,7 +1044,7 @@ export function AddDataView({
                 onChange={(e) => setBatchComputerRoom(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {COMPUTER_ROOMS.map((room) => (
+                {computerRooms.map((room) => (
                   <option key={room} value={room}>
                     {room}
                   </option>
@@ -1025,7 +1063,7 @@ export function AddDataView({
                 onChange={(e) => setBatchClass(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {CLASS_LIST.map((cls) => {
+                {classList.map((cls) => {
                   const count = studentCountByClass[cls] || 0;
                   return (
                     <option key={cls} value={cls}>
@@ -1360,7 +1398,13 @@ export function AddDataView({
                     onChange={(e) => setExtComputerRoom(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    {COMPUTER_ROOMS.map((room) => (
+                    {Array.from(
+                      new Set(
+                        editingLog?.computerRoom
+                          ? [...computerRooms, editingLog.computerRoom]
+                          : computerRooms
+                      )
+                    ).map((room) => (
                       <option key={room} value={room}>
                         {room}
                       </option>

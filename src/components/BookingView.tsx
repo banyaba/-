@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CalendarClock,
   CalendarPlus,
@@ -17,12 +17,11 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import {
-  BOOKING_GROUP_OPTIONS,
-  CLASS_LIST,
-  COMPUTER_ROOMS,
   COMPUTER_STATIONS,
   DEFAULT_SCHEDULE_TIMES,
   EXTERNAL_VISITOR_CLASS,
+  getActiveClassList,
+  getActiveComputerRooms,
   type AppSettings,
   type BookingMode,
   type BookingStatus,
@@ -59,11 +58,6 @@ interface BookingViewProps {
   onNotify: (type: 'success' | 'error', message: string) => void;
 }
 
-const INDIVIDUAL_GROUP_OPTIONS: readonly string[] = [
-  ...CLASS_LIST,
-  EXTERNAL_VISITOR_CLASS,
-];
-
 export function BookingView({
   role,
   activeMode,
@@ -84,6 +78,23 @@ export function BookingView({
   onOpenAdminLogin,
   onNotify,
 }: BookingViewProps) {
+  const activeClassList = useMemo(() => getActiveClassList(settings), [settings]);
+  const activeRooms = useMemo(() => getActiveComputerRooms(settings), [settings]);
+  const individualGroupOptions = useMemo(
+    () => [...activeClassList, EXTERNAL_VISITOR_CLASS],
+    [activeClassList]
+  );
+  const fullRoomGroupOptions = useMemo(
+    () => [
+      ...activeClassList,
+      'ทั้งระดับชั้น / หลายห้อง',
+      'คณะครู / บุคลากร',
+      'อบรม / ประชุม / กิจกรรมพิเศษ',
+      EXTERNAL_VISITOR_CLASS,
+    ],
+    [activeClassList]
+  );
+
   const managerOptions = useMemo(() => {
     const seen = new Set<string>();
     const list: string[] = [];
@@ -119,24 +130,43 @@ export function BookingView({
   const [date, setDate] = useState(getTodayISO());
   const [startTime, setStartTime] = useState('08:30');
   const [endTime, setEndTime] = useState('09:30');
-  const [computerRoom, setComputerRoom] = useState(COMPUTER_ROOMS[0]);
+  const [computerRoom, setComputerRoom] = useState(() => activeRooms[0] || '');
 
   // Sub-menu 1: จองรายคน State
   const [indStation, setIndStation] = useState('1');
   const [indRequesterName, setIndRequesterName] = useState('');
-  const [indClassName, setIndClassName] = useState(CLASS_LIST[12] || CLASS_LIST[0]);
+  const [indClassName, setIndClassName] = useState(
+    () => activeClassList[12] || activeClassList[0] || EXTERNAL_VISITOR_CLASS
+  );
   const [indPurpose, setIndPurpose] = useState('ค้นคว้าข้อมูล / ทำรายงาน');
   const [indNote, setIndNote] = useState('');
 
   // Sub-menu 2: จองเครื่องทั้งห้อง State
   const [fullRequesterName, setFullRequesterName] = useState('');
-  const [fullClassName, setFullClassName] = useState(CLASS_LIST[12] || CLASS_LIST[0]);
+  const [fullClassName, setFullClassName] = useState(
+    () => activeClassList[12] || activeClassList[0] || EXTERNAL_VISITOR_CLASS
+  );
   const [fullSubjectChoice, setFullSubjectChoice] = useState(() =>
     subjects.length > 0 ? subjects[0].name : '__custom__'
   );
   const [fullCustomSubject, setFullCustomSubject] = useState('');
   const [fullSeatCount, setFullSeatCount] = useState(30);
   const [fullNote, setFullNote] = useState('');
+
+  useEffect(() => {
+    if (activeRooms.length > 0 && !activeRooms.includes(computerRoom)) {
+      setComputerRoom(activeRooms[0]);
+    }
+  }, [activeRooms, computerRoom]);
+
+  useEffect(() => {
+    if (!individualGroupOptions.includes(indClassName)) {
+      setIndClassName(activeClassList[0] || EXTERNAL_VISITOR_CLASS);
+    }
+    if (!fullRoomGroupOptions.includes(fullClassName)) {
+      setFullClassName(activeClassList[0] || EXTERNAL_VISITOR_CLASS);
+    }
+  }, [activeClassList, individualGroupOptions, fullRoomGroupOptions, indClassName, fullClassName]);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -502,7 +532,7 @@ export function BookingView({
           {effectiveTab === 'report'
             ? 'สรุปรายงานและพิมพ์เอกสารการจองห้องคอมพิวเตอร์ (สำหรับผู้ดูแลระบบ)'
             : effectiveTab === 'schedule'
-            ? 'ตารางคาบสอนประจำวันจันทร์ – ศุกร์ ห้องคอม 1 และ ห้องคอม 2'
+            ? `ตารางคาบสอนประจำวันจันทร์ – ศุกร์ (${activeRooms.map((r) => `ห้อง ${r}`).join(' / ')})`
             : effectiveTab === 'individual'
             ? 'เลือกจองเฉพาะเครื่องคอมพิวเตอร์รายบุคคล (1 เครื่อง)'
             : 'จองเครื่องทั้งห้องสำหรับการสอน อบรม หรือกิจกรรมกลุ่ม'}
@@ -694,7 +724,7 @@ export function BookingView({
                     onChange={(e) => setComputerRoom(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
                   >
-                    {COMPUTER_ROOMS.map((r) => (
+                    {activeRooms.map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>
@@ -779,7 +809,7 @@ export function BookingView({
                     onChange={(e) => setIndClassName(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
                   >
-                    {INDIVIDUAL_GROUP_OPTIONS.map((grp) => (
+                    {individualGroupOptions.map((grp) => (
                       <option key={grp} value={grp}>
                         {grp}
                       </option>
@@ -980,7 +1010,7 @@ export function BookingView({
                     onChange={(e) => setComputerRoom(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    {COMPUTER_ROOMS.map((r) => (
+                    {activeRooms.map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>
@@ -1015,7 +1045,7 @@ export function BookingView({
                     onChange={(e) => setFullClassName(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    {BOOKING_GROUP_OPTIONS.map((grp) => (
+                    {fullRoomGroupOptions.map((grp) => (
                       <option key={grp} value={grp}>
                         {grp}
                       </option>
@@ -1173,7 +1203,7 @@ export function BookingView({
           </div>
 
           <div className="p-5 space-y-4 flex-1 overflow-y-auto max-h-[580px]">
-            {COMPUTER_ROOMS.map((roomName) => {
+            {activeRooms.map((roomName) => {
               const roomItems = scheduleForDate.filter((b) => b.computerRoom === roomName);
               return (
                 <div key={roomName} className="space-y-2">
@@ -1309,7 +1339,7 @@ export function BookingView({
               className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option value="all">ทุกห้อง</option>
-              {COMPUTER_ROOMS.map((r) => (
+              {Array.from(new Set([...activeRooms, ...bookings.map((b) => b.computerRoom).filter(Boolean)])).map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>

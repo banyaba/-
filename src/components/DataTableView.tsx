@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Search, Calendar, Trash2, Pencil, RotateCcw } from 'lucide-react';
-import { CLASS_LIST, EXTERNAL_VISITOR_CLASS, type Subject, type UsageLog, type UserRole } from '../types';
+import { EXTERNAL_VISITOR_CLASS, type Subject, type UsageLog, type UserRole } from '../types';
 import { formatBuddhistISO, getTodayISO } from '../utils/thaiDate';
 import { api } from '../api/client';
 import { ConfirmModal } from './ConfirmModal';
@@ -9,6 +9,7 @@ interface DataTableViewProps {
   role: UserRole;
   logs: UsageLog[];
   subjects: Subject[];
+  classList: string[];
   onEditLog: (log: UsageLog) => void;
   onLogsChanged: (next: UsageLog[]) => void;
   onNotify: (type: 'success' | 'error', message: string) => void;
@@ -18,6 +19,7 @@ export function DataTableView({
   role,
   logs,
   subjects,
+  classList,
   onEditLog,
   onLogsChanged,
   onNotify,
@@ -42,6 +44,19 @@ export function DataTableView({
     logs.forEach((l) => names.add(l.subjectName));
     return Array.from(names).sort((a, b) => a.localeCompare(b, 'th'));
   }, [subjects, logs]);
+
+  const classOptions = useMemo(() => {
+    const seen = new Set<string>(classList);
+    const extra: string[] = [];
+    for (const l of logs) {
+      const cls = l.className?.trim();
+      if (cls && cls !== EXTERNAL_VISITOR_CLASS && !seen.has(cls)) {
+        seen.add(cls);
+        extra.push(cls);
+      }
+    }
+    return [...classList, ...extra.sort((a, b) => a.localeCompare(b, 'th'))];
+  }, [classList, logs]);
 
   const filteredLogs = useMemo(() => {
     const q = searchName.trim().toLowerCase();
@@ -152,7 +167,7 @@ export function DataTableView({
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
                 <option value="all">ทุกชั้นเรียน</option>
-                {CLASS_LIST.map((cls) => (
+                {classOptions.map((cls) => (
                   <option key={cls} value={cls}>
                     {cls}
                   </option>

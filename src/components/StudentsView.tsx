@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   UserPlus,
   FileSpreadsheet,
@@ -15,12 +15,13 @@ import {
   Square,
   Search,
 } from 'lucide-react';
-import { CLASS_LIST, type Student } from '../types';
+import { EXTERNAL_VISITOR_CLASS, type Student } from '../types';
 import { api } from '../api/client';
 import { ConfirmModal } from './ConfirmModal';
 
 interface StudentsViewProps {
   students: Student[];
+  classList: string[];
   onStudentsChanged: (next: Student[]) => void;
   onNotify: (type: 'success' | 'error', message: string) => void;
 }
@@ -37,16 +38,30 @@ interface ParsedStudentRow {
 
 export function StudentsView({
   students,
+  classList,
   onStudentsChanged,
   onNotify,
 }: StudentsViewProps) {
   const [activeTab, setActiveTab] = useState<'add' | 'bulk' | 'manage'>('add');
 
+  const classOptions = useMemo(() => {
+    const seen = new Set<string>(classList);
+    const extra: string[] = [];
+    for (const stu of students) {
+      const cls = stu.className?.trim();
+      if (cls && cls !== EXTERNAL_VISITOR_CLASS && !seen.has(cls)) {
+        seen.add(cls);
+        extra.push(cls);
+      }
+    }
+    return [...classList, ...extra.sort((a, b) => a.localeCompare(b, 'th'))];
+  }, [classList, students]);
+
   // Tab 1: Add / Edit Student
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [numberInput, setNumberInput] = useState('');
   const [nameInput, setNameInput] = useState('');
-  const [classInput, setClassInput] = useState(CLASS_LIST[12]); // ป.5/1
+  const [classInput, setClassInput] = useState(() => classList[12] || classList[0] || '');
   const [savingOne, setSavingOne] = useState(false);
 
   // Tab 2: Bulk Import
@@ -55,7 +70,7 @@ export function StudentsView({
   const [bulkSaving, setBulkSaving] = useState(false);
 
   // Tab 3: Class Management
-  const [manageClass, setManageClass] = useState(CLASS_LIST[12]);
+  const [manageClass, setManageClass] = useState(() => classList[12] || classList[0] || '');
   const [manageSelectedIds, setManageSelectedIds] = useState<string[]>([]);
   const [confirmState, setConfirmState] = useState<{
     open: boolean;
@@ -68,6 +83,18 @@ export function StudentsView({
   // Table Filters
   const [tableClassFilter, setTableClassFilter] = useState('all');
   const [tableSearch, setTableSearch] = useState('');
+
+  useEffect(() => {
+    if (!editingStudent && classList.length > 0 && !classList.includes(classInput)) {
+      setClassInput(classList[0]);
+    }
+  }, [classList, classInput, editingStudent]);
+
+  useEffect(() => {
+    if (classOptions.length > 0 && !classOptions.includes(manageClass)) {
+      setManageClass(classOptions[0]);
+    }
+  }, [classOptions, manageClass]);
 
   const filteredStudents = useMemo(() => {
     const q = tableSearch.trim().toLowerCase();
@@ -185,8 +212,8 @@ export function StudentsView({
         errors.push('ชื่อห้ามว่าง');
       }
 
-      if (!CLASS_LIST.includes(className)) {
-        errors.push('ชั้นเรียนไม่ถูกต้อง (ต้องเป็น ป.1/1 - ป.6/3)');
+      if (!className || className === EXTERNAL_VISITOR_CLASS || !classList.includes(className)) {
+        errors.push('ไม่พบชั้นเรียนนี้ในรายการชั้นเรียนที่ตั้งค่าไว้');
       }
 
       parsed.push({
@@ -367,7 +394,13 @@ export function StudentsView({
                 onChange={(e) => setClassInput(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {CLASS_LIST.map((cls) => (
+                {Array.from(
+                  new Set(
+                    editingStudent && editingStudent.className
+                      ? [...classList, editingStudent.className]
+                      : classList
+                  )
+                ).map((cls) => (
                   <option key={cls} value={cls}>
                     {cls}
                   </option>
@@ -433,8 +466,10 @@ export function StudentsView({
               <button
                 type="button"
                 onClick={() => {
+                  const sampleC1 = classList[12] || classList[0] || 'ป.5/1';
+                  const sampleC2 = classList[13] || classList[1] || sampleC1;
                   setBulkText(
-                    `เลขที่\tชื่อ-สกุล\tชั้นเรียน\n1\tสมชาย ใจดี\tป.5/1\n2\tสมหญิง รักเรียน\tป.5/1\n3\tธนกฤต แสนสุข\tป.5/2`
+                    `เลขที่\tชื่อ-สกุล\tชั้นเรียน\n1\tสมชาย ใจดี\t${sampleC1}\n2\tสมหญิง รักเรียน\t${sampleC1}\n3\tธนกฤต แสนสุข\t${sampleC2}`
                   );
                   setPreviewRows(null);
                 }}
@@ -451,7 +486,7 @@ export function StudentsView({
                 setBulkText(e.target.value);
                 setPreviewRows(null);
               }}
-              placeholder={`1\tสมชาย ใจดี\tป.5/1\n2\tสมหญิง รักเรียน\tป.5/1`}
+              placeholder={`1\tสมชาย ใจดี\t${classList[12] || classList[0] || 'ป.5/1'}\n2\tสมหญิง รักเรียน\t${classList[12] || classList[0] || 'ป.5/1'}`}
               className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -582,7 +617,7 @@ export function StudentsView({
                 }}
                 className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {CLASS_LIST.map((cls) => (
+                {classOptions.map((cls) => (
                   <option key={cls} value={cls}>
                     {cls}
                   </option>
@@ -736,7 +771,7 @@ export function StudentsView({
               className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
             >
               <option value="all">ทุกชั้นเรียน</option>
-              {CLASS_LIST.map((cls) => (
+              {classOptions.map((cls) => (
                 <option key={cls} value={cls}>
                   {cls}
                 </option>

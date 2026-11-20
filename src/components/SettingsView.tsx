@@ -25,10 +25,16 @@ import {
   Download,
   Upload,
   CheckCircle2,
+  Monitor,
+  Layers,
 } from 'lucide-react';
 import {
   CLASS_LIST,
+  COMPUTER_ROOMS,
   DEFAULT_THEME_COLORS,
+  EXTERNAL_VISITOR_CLASS,
+  getActiveClassList,
+  getActiveComputerRooms,
   type AppSettings,
   type Student,
   type ThemeColors,
@@ -51,6 +57,7 @@ import {
   updateSecurityPins,
   type FullBackupPayload,
 } from '../firebase/firestoreService';
+import { LIMITS } from '../firebase/validation';
 import { getTodayISO } from '../utils/thaiDate';
 
 interface SettingsViewProps {
@@ -111,15 +118,21 @@ const COLOR_PRESETS: { name: string; colors: ThemeColors }[] = [
   },
 ];
 
-function suggestNextClass(cls: string): string {
-  const m = /^ป\.([1-6])\/([1-3])$/.exec(cls.trim());
-  if (!m) return 'ป.6/1';
-  const grade = Number(m[1]);
-  const room = m[2];
-  if (grade < 6) {
-    return `ป.${grade + 1}/${room}`;
+function suggestNextClass(cls: string, classOptions: readonly string[] = []): string {
+  const m = /^ป\.([1-6])\/(\d+)$/.exec(cls.trim());
+  if (m) {
+    const grade = Number(m[1]);
+    const room = m[2];
+    const target = grade < 6 ? `ป.${grade + 1}/${room}` : `ป.5/${room}`;
+    if (classOptions.length === 0 || classOptions.includes(target)) {
+      return target;
+    }
   }
-  return `ป.5/${room}`;
+  const idx = classOptions.indexOf(cls);
+  if (idx >= 0 && idx + 1 < classOptions.length) {
+    return classOptions[idx + 1];
+  }
+  return classOptions.find((c) => c !== cls) || 'ป.6/1';
 }
 
 export function SettingsView({
@@ -161,6 +174,31 @@ export function SettingsView({
   const [colors, setColors] = useState<ThemeColors>(settings.colors);
   const [saving, setSaving] = useState(false);
 
+  const activeClassList = useMemo(() => getActiveClassList(settings), [settings]);
+  const activeComputerRooms = useMemo(() => getActiveComputerRooms(settings), [settings]);
+
+  // Classrooms CRUD State
+  const [newClassName, setNewClassName] = useState('');
+  const [addingClass, setAddingClass] = useState(false);
+  const [editingClassIdx, setEditingClassIdx] = useState<number | null>(null);
+  const [editingClassValue, setEditingClassValue] = useState('');
+  const [savingClassEdit, setSavingClassEdit] = useState(false);
+  const [confirmDeleteClassIdx, setConfirmDeleteClassIdx] = useState<number | null>(null);
+  const [deletingClassIdx, setDeletingClassIdx] = useState<number | null>(null);
+  const [confirmResetClasses, setConfirmResetClasses] = useState(false);
+  const [resettingClasses, setResettingClasses] = useState(false);
+
+  // Computer Rooms CRUD State
+  const [newRoomName, setNewRoomName] = useState('');
+  const [addingRoom, setAddingRoom] = useState(false);
+  const [editingRoomIdx, setEditingRoomIdx] = useState<number | null>(null);
+  const [editingRoomValue, setEditingRoomValue] = useState('');
+  const [savingRoomEdit, setSavingRoomEdit] = useState(false);
+  const [confirmDeleteRoomIdx, setConfirmDeleteRoomIdx] = useState<number | null>(null);
+  const [deletingRoomIdx, setDeletingRoomIdx] = useState<number | null>(null);
+  const [confirmResetRooms, setConfirmResetRooms] = useState(false);
+  const [resettingRooms, setResettingRooms] = useState(false);
+
   // Grade Promotion State
   const studentCountByClass = useMemo(() => {
     const map: Record<string, number> = {};
@@ -170,6 +208,14 @@ export function SettingsView({
     return map;
   }, [students]);
 
+  const allClassOptions = useMemo(() => {
+    const seen = new Set<string>(activeClassList);
+    const extra = Object.keys(studentCountByClass)
+      .filter((cls) => cls && cls !== EXTERNAL_VISITOR_CLASS && !seen.has(cls))
+      .sort((a, b) => a.localeCompare(b, 'th'));
+    return [...activeClassList, ...extra];
+  }, [activeClassList, studentCountByClass]);
+
   const [promoMode, setPromoMode] = useState<'all' | 'room'>('all');
   const [p6Action, setP6Action] = useState<'delete' | 'keep'>('delete');
   const [updateYearOnPromote, setUpdateYearOnPromote] = useState(true);
@@ -178,11 +224,12 @@ export function SettingsView({
     return Number.isFinite(num) && num >= 2500 ? String(num + 1) : '2570';
   });
   const [fromClass, setFromClass] = useState<string>(() => {
-    return CLASS_LIST.find((c) => (studentCountByClass[c] || 0) > 0 && !c.startsWith('ป.6/'))
-      || CLASS_LIST.find((c) => (studentCountByClass[c] || 0) > 0)
+    return allClassOptions.find((c) => (studentCountByClass[c] || 0) > 0 && !c.startsWith('ป.6/'))
+      || allClassOptions.find((c) => (studentCountByClass[c] || 0) > 0)
+      || allClassOptions[0]
       || 'ป.5/1';
   });
-  const [toClass, setToClass] = useState<string>(() => suggestNextClass(fromClass));
+  const [toClass, setToClass] = useState<string>(() => suggestNextClass(fromClass, allClassOptions));
   const [excludedStudentIds, setExcludedStudentIds] = useState<string[]>([]);
   const [promoConfirmOpen, setPromoConfirmOpen] = useState(false);
   const [promoting, setPromoting] = useState(false);
@@ -254,14 +301,27 @@ export function SettingsView({
     );
   }, [studentCountByClass]);
 
+  // Keep Grade Promotion selectors synced when classList changes
+  useEffect(() => {
+    if (allClassOptions.length === 0) return;
+    if (!allClassOptions.includes(fromClass)) {
+      const nextFrom = allClassOptions[0];
+      setFromClass(nextFrom);
+      setExcludedStudentIds([]);
+    }
+    if (!allClassOptions.includes(toClass)) {
+      setToClass(suggestNextClass(fromClass, allClassOptions));
+    }
+  }, [allClassOptions, fromClass, toClass]);
+
   const roomsWithStudents = useMemo(
-    () => CLASS_LIST.filter((cls) => (studentCountByClass[cls] || 0) > 0),
-    [studentCountByClass]
+    () => allClassOptions.filter((cls) => (studentCountByClass[cls] || 0) > 0),
+    [allClassOptions, studentCountByClass]
   );
 
   const orderedSelectedClearRooms = useMemo(
-    () => CLASS_LIST.filter((cls) => selectedClearRooms.includes(cls)),
-    [selectedClearRooms]
+    () => allClassOptions.filter((cls) => selectedClearRooms.includes(cls)),
+    [allClassOptions, selectedClearRooms]
   );
 
   const selectedClearStudentCount = useMemo(
@@ -708,6 +768,246 @@ export function SettingsView({
     }
   };
 
+  // --- Classrooms CRUD Handlers ---
+  const handleAddClass = async () => {
+    const trimmed = newClassName.trim();
+    if (!trimmed) {
+      onNotify('error', 'กรุณากรอกชื่อชั้นเรียนที่ต้องการเพิ่ม');
+      return;
+    }
+    if (trimmed === EXTERNAL_VISITOR_CLASS) {
+      onNotify('error', 'ไม่สามารถใช้ชื่อ "บุคคลภายนอก" เป็นชื่อชั้นเรียนได้');
+      return;
+    }
+    if (trimmed.length > LIMITS.CLASS_MAX) {
+      onNotify('error', `ชื่อชั้นเรียนต้องไม่เกิน ${LIMITS.CLASS_MAX} ตัวอักษร`);
+      return;
+    }
+    if (activeClassList.includes(trimmed)) {
+      onNotify('error', `ชั้นเรียน "${trimmed}" มีอยู่ในระบบแล้ว`);
+      return;
+    }
+    if (activeClassList.length >= LIMITS.CLASS_LIST_MAX) {
+      onNotify('error', `สามารถเพิ่มชั้นเรียนได้สูงสุด ${LIMITS.CLASS_LIST_MAX} ห้อง`);
+      return;
+    }
+
+    setAddingClass(true);
+    try {
+      const nextList = [...activeClassList, trimmed];
+      const res = await api.updateClassList(nextList);
+      onSettingsUpdated({ ...settings, classList: res.classList });
+      setNewClassName('');
+      onNotify('success', `เพิ่มชั้นเรียน "${trimmed}" เรียบร้อยแล้ว`);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถเพิ่มชั้นเรียนได้');
+    } finally {
+      setAddingClass(false);
+    }
+  };
+
+  const handleSaveEditClass = async (idx: number) => {
+    const trimmed = editingClassValue.trim();
+    const oldName = activeClassList[idx];
+    if (!trimmed) {
+      onNotify('error', 'ชื่อชั้นเรียนห้ามว่าง');
+      return;
+    }
+    if (trimmed === EXTERNAL_VISITOR_CLASS) {
+      onNotify('error', 'ไม่สามารถใช้ชื่อ "บุคคลภายนอก" เป็นชื่อชั้นเรียนได้');
+      return;
+    }
+    if (trimmed.length > LIMITS.CLASS_MAX) {
+      onNotify('error', `ชื่อชั้นเรียนต้องไม่เกิน ${LIMITS.CLASS_MAX} ตัวอักษร`);
+      return;
+    }
+    if (trimmed === oldName) {
+      setEditingClassIdx(null);
+      return;
+    }
+    if (activeClassList.some((c, i) => i !== idx && c === trimmed)) {
+      onNotify('error', `ชั้นเรียน "${trimmed}" มีอยู่ในระบบแล้ว`);
+      return;
+    }
+
+    setSavingClassEdit(true);
+    try {
+      const nextList = [...activeClassList];
+      nextList[idx] = trimmed;
+      const res = await api.updateClassList(nextList, { from: oldName, to: trimmed });
+      onSettingsUpdated({ ...settings, classList: res.classList });
+      if (res.renamedStudents > 0) {
+        onStudentsChanged(
+          students.map((s) => (s.className === oldName ? { ...s, className: trimmed } : s))
+        );
+      }
+      if (fromClass === oldName) setFromClass(trimmed);
+      if (toClass === oldName) setToClass(trimmed);
+      setEditingClassIdx(null);
+
+      const syncNotes: string[] = [];
+      if (res.renamedStudents > 0) syncNotes.push(`นักเรียน ${res.renamedStudents} คน`);
+      if (res.renamedLogs > 0) syncNotes.push(`ประวัติ ${res.renamedLogs} รายการ`);
+      if (res.renamedSchedules > 0) syncNotes.push(`ตารางสอน ${res.renamedSchedules} คาบ`);
+      const syncText = syncNotes.length > 0 ? ` (อัปเดตข้อมูลที่เกี่ยวข้อง: ${syncNotes.join(', ')})` : '';
+      onNotify('success', `แก้ไขชื่อชั้นเรียน "${oldName}" → "${trimmed}" เรียบร้อยแล้ว${syncText}`);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถแก้ไขชั้นเรียนได้');
+    } finally {
+      setSavingClassEdit(false);
+    }
+  };
+
+  const handleDeleteClass = async (idx: number) => {
+    if (activeClassList.length <= 1) {
+      onNotify('error', 'ต้องมีชั้นเรียนอย่างน้อย 1 ห้องในระบบ');
+      setConfirmDeleteClassIdx(null);
+      return;
+    }
+    const targetName = activeClassList[idx];
+    setDeletingClassIdx(idx);
+    try {
+      const nextList = activeClassList.filter((_, i) => i !== idx);
+      const res = await api.updateClassList(nextList);
+      onSettingsUpdated({ ...settings, classList: res.classList });
+      setConfirmDeleteClassIdx(null);
+      if (editingClassIdx === idx) setEditingClassIdx(null);
+      onNotify('success', `ลบชั้นเรียน "${targetName}" ออกจากรายการแล้ว`);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถลบชั้นเรียนได้');
+    } finally {
+      setDeletingClassIdx(null);
+    }
+  };
+
+  const handleResetDefaultClasses = async () => {
+    setResettingClasses(true);
+    try {
+      const res = await api.updateClassList([...CLASS_LIST]);
+      onSettingsUpdated({ ...settings, classList: res.classList });
+      setConfirmResetClasses(false);
+      setEditingClassIdx(null);
+      setConfirmDeleteClassIdx(null);
+      onNotify('success', `รีเซ็ตรายการชั้นเรียนเป็นค่าเริ่มต้น (${CLASS_LIST.length} ห้อง) เรียบร้อยแล้ว`);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถรีเซ็ตชั้นเรียนได้');
+    } finally {
+      setResettingClasses(false);
+    }
+  };
+
+  // --- Computer Rooms CRUD Handlers ---
+  const handleAddRoom = async () => {
+    const trimmed = newRoomName.trim();
+    if (!trimmed) {
+      onNotify('error', 'กรุณากรอกชื่อห้องคอมพิวเตอร์ที่ต้องการเพิ่ม');
+      return;
+    }
+    if (trimmed.length > LIMITS.CLASS_MAX) {
+      onNotify('error', `ชื่อห้องคอมพิวเตอร์ต้องไม่เกิน ${LIMITS.CLASS_MAX} ตัวอักษร`);
+      return;
+    }
+    if (activeComputerRooms.includes(trimmed)) {
+      onNotify('error', `ห้องคอมพิวเตอร์ "${trimmed}" มีอยู่ในระบบแล้ว`);
+      return;
+    }
+    if (activeComputerRooms.length >= LIMITS.COMPUTER_ROOMS_MAX) {
+      onNotify('error', `สามารถเพิ่มห้องคอมพิวเตอร์ได้สูงสุด ${LIMITS.COMPUTER_ROOMS_MAX} ห้อง`);
+      return;
+    }
+
+    setAddingRoom(true);
+    try {
+      const nextRooms = [...activeComputerRooms, trimmed];
+      const res = await api.updateComputerRooms(nextRooms);
+      onSettingsUpdated({ ...settings, computerRooms: res.computerRooms });
+      setNewRoomName('');
+      onNotify('success', `เพิ่มห้องคอมพิวเตอร์ "${trimmed}" เรียบร้อยแล้ว`);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถเพิ่มห้องคอมพิวเตอร์ได้');
+    } finally {
+      setAddingRoom(false);
+    }
+  };
+
+  const handleSaveEditRoom = async (idx: number) => {
+    const trimmed = editingRoomValue.trim();
+    const oldName = activeComputerRooms[idx];
+    if (!trimmed) {
+      onNotify('error', 'ชื่อห้องคอมพิวเตอร์ห้ามว่าง');
+      return;
+    }
+    if (trimmed.length > LIMITS.CLASS_MAX) {
+      onNotify('error', `ชื่อห้องคอมพิวเตอร์ต้องไม่เกิน ${LIMITS.CLASS_MAX} ตัวอักษร`);
+      return;
+    }
+    if (trimmed === oldName) {
+      setEditingRoomIdx(null);
+      return;
+    }
+    if (activeComputerRooms.some((r, i) => i !== idx && r === trimmed)) {
+      onNotify('error', `ห้องคอมพิวเตอร์ "${trimmed}" มีอยู่ในระบบแล้ว`);
+      return;
+    }
+
+    setSavingRoomEdit(true);
+    try {
+      const nextRooms = [...activeComputerRooms];
+      nextRooms[idx] = trimmed;
+      const res = await api.updateComputerRooms(nextRooms, { from: oldName, to: trimmed });
+      onSettingsUpdated({ ...settings, computerRooms: res.computerRooms });
+      setEditingRoomIdx(null);
+
+      const syncNotes: string[] = [];
+      if (res.renamedLogs > 0) syncNotes.push(`ประวัติการใช้งาน ${res.renamedLogs} รายการ`);
+      if (res.renamedSchedules > 0) syncNotes.push(`ตารางสอน ${res.renamedSchedules} คาบ`);
+      const syncText = syncNotes.length > 0 ? ` (อัปเดตข้อมูลที่เกี่ยวข้อง: ${syncNotes.join(', ')})` : '';
+      onNotify('success', `แก้ไขชื่อห้องคอมพิวเตอร์ "${oldName}" → "${trimmed}" เรียบร้อยแล้ว${syncText}`);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถแก้ไขห้องคอมพิวเตอร์ได้');
+    } finally {
+      setSavingRoomEdit(false);
+    }
+  };
+
+  const handleDeleteRoom = async (idx: number) => {
+    if (activeComputerRooms.length <= 1) {
+      onNotify('error', 'ต้องมีห้องคอมพิวเตอร์อย่างน้อย 1 ห้องในระบบ');
+      setConfirmDeleteRoomIdx(null);
+      return;
+    }
+    const targetName = activeComputerRooms[idx];
+    setDeletingRoomIdx(idx);
+    try {
+      const nextRooms = activeComputerRooms.filter((_, i) => i !== idx);
+      const res = await api.updateComputerRooms(nextRooms);
+      onSettingsUpdated({ ...settings, computerRooms: res.computerRooms });
+      setConfirmDeleteRoomIdx(null);
+      if (editingRoomIdx === idx) setEditingRoomIdx(null);
+      onNotify('success', `ลบห้องคอมพิวเตอร์ "${targetName}" ออกจากรายการแล้ว`);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถลบห้องคอมพิวเตอร์ได้');
+    } finally {
+      setDeletingRoomIdx(null);
+    }
+  };
+
+  const handleResetDefaultRooms = async () => {
+    setResettingRooms(true);
+    try {
+      const res = await api.updateComputerRooms([...COMPUTER_ROOMS]);
+      onSettingsUpdated({ ...settings, computerRooms: res.computerRooms });
+      setConfirmResetRooms(false);
+      setEditingRoomIdx(null);
+      setConfirmDeleteRoomIdx(null);
+      onNotify('success', `รีเซ็ตห้องคอมพิวเตอร์เป็นค่าเริ่มต้น (${COMPUTER_ROOMS.join(', ')}) เรียบร้อยแล้ว`);
+    } catch (err) {
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถรีเซ็ตห้องคอมพิวเตอร์ได้');
+    } finally {
+      setResettingRooms(false);
+    }
+  };
+
   const handleColorChange = (key: keyof ThemeColors, value: string) => {
     const nextColors = { ...colors, [key]: value };
     setColors(nextColors);
@@ -1114,13 +1414,422 @@ export function SettingsView({
       </section>
     </form>
 
+    {/* Classrooms & Computer Rooms Management Section */}
+    <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-100/80 dark:border-sky-900/50 bg-gradient-to-r from-sky-50/90 via-blue-50/60 to-transparent dark:from-sky-950/40 dark:via-blue-950/30 dark:to-transparent px-6 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-blue-600 text-white shadow-xs shrink-0">
+            <Layers className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              จัดการชั้นเรียนและห้องคอมพิวเตอร์
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              เพิ่ม แก้ไข หรือลบรายชื่อชั้นเรียนและห้องคอมพิวเตอร์ที่ใช้ทั่วทั้งระบบ (แก้ไขชื่อจะอัปเดตข้อมูลที่เชื่อมโยงให้อัตโนมัติ)
+            </p>
+          </div>
+        </div>
+
+        <div className="font-mono-num text-xs font-medium text-sky-800 dark:text-sky-300">
+          ชั้นเรียน {activeClassList.length}/{LIMITS.CLASS_LIST_MAX} · ห้องคอม {activeComputerRooms.length}/{LIMITS.COMPUTER_ROOMS_MAX}
+        </div>
+      </div>
+
+      <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Column 1: Classrooms (classList) */}
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40 p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <School className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                รายชื่อชั้นเรียน ({activeClassList.length}/{LIMITS.CLASS_LIST_MAX})
+              </h3>
+            </div>
+
+            {confirmResetClasses ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={resettingClasses}
+                  onClick={() => void handleResetDefaultClasses()}
+                  className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {resettingClasses ? 'กำลังรีเซ็ต...' : 'ยืนยันรีเซ็ต ป.1/1–ป.6/3'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmResetClasses(false)}
+                  className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmResetClasses(true)}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>รีเซ็ตค่าเริ่มต้น</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              maxLength={LIMITS.CLASS_MAX}
+              value={newClassName}
+              onChange={(e) => setNewClassName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void handleAddClass();
+                }
+              }}
+              placeholder="เพิ่มชั้นเรียน เช่น ป.5/4, ม.1/1, อนุบาล 3"
+              className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+            <button
+              type="button"
+              disabled={addingClass || !newClassName.trim() || activeClassList.length >= LIMITS.CLASS_LIST_MAX}
+              onClick={() => void handleAddClass()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-50 whitespace-nowrap shrink-0 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{addingClass ? 'กำลังเพิ่ม...' : 'เพิ่มชั้นเรียน'}</span>
+            </button>
+          </div>
+
+          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            {activeClassList.map((cls, idx) => {
+              const stuCount = studentCountByClass[cls] || 0;
+              const isEditing = editingClassIdx === idx;
+              const isConfirmDelete = confirmDeleteClassIdx === idx;
+
+              return (
+                <div
+                  key={`${idx}-${cls}`}
+                  className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-3.5 py-2"
+                >
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <span className="font-mono-num text-[11px] text-slate-400 w-6 shrink-0">
+                      {idx + 1}.
+                    </span>
+
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        maxLength={LIMITS.CLASS_MAX}
+                        value={editingClassValue}
+                        onChange={(e) => setEditingClassValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void handleSaveEditClass(idx);
+                          } else if (e.key === 'Escape') {
+                            setEditingClassIdx(null);
+                          }
+                        }}
+                        autoFocus
+                        className="flex-1 rounded-md border border-sky-400 bg-white dark:bg-slate-800 px-2.5 py-1 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                          {cls}
+                        </span>
+                        <span className="font-mono-num text-[11px] text-slate-400 dark:text-slate-500 shrink-0">
+                          ({stuCount} คน)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveEditClass(idx)}
+                          disabled={savingClassEdit}
+                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          <span>{savingClassEdit ? 'กำลังบันทึก...' : 'บันทึก'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingClassIdx(null)}
+                          disabled={savingClassEdit}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    ) : isConfirmDelete ? (
+                      <>
+                        {stuCount > 0 && (
+                          <span className="text-[10px] text-amber-600 dark:text-amber-400 mr-1 whitespace-nowrap">
+                            นักเรียน {stuCount} คนยังอยู่
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteClass(idx)}
+                          disabled={deletingClassIdx === idx}
+                          className="rounded-md bg-rose-600 px-2 py-1 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                        >
+                          {deletingClassIdx === idx ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteClassIdx(null)}
+                          className="rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          ยกเลิก
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingClassIdx(idx);
+                            setEditingClassValue(cls);
+                            setConfirmDeleteClassIdx(null);
+                          }}
+                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-sky-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-400 transition-colors"
+                          title="แก้ไขชื่อชั้นเรียน"
+                          aria-label={`แก้ไข ${cls}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        {activeClassList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmDeleteClassIdx(idx);
+                              setEditingClassIdx(null);
+                            }}
+                            className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 transition-colors"
+                            title="ลบชั้นเรียน"
+                            aria-label={`ลบ ${cls}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Column 2: Computer Rooms (computerRooms) */}
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40 p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Monitor className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                รายชื่อห้องคอมพิวเตอร์ ({activeComputerRooms.length}/{LIMITS.COMPUTER_ROOMS_MAX})
+              </h3>
+            </div>
+
+            {confirmResetRooms ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={resettingRooms}
+                  onClick={() => void handleResetDefaultRooms()}
+                  className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {resettingRooms ? 'กำลังรีเซ็ต...' : 'ยืนยันรีเซ็ต (คอม1, คอม2)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmResetRooms(false)}
+                  className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmResetRooms(true)}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>รีเซ็ตค่าเริ่มต้น</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              maxLength={LIMITS.CLASS_MAX}
+              value={newRoomName}
+              onChange={(e) => setNewRoomName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void handleAddRoom();
+                }
+              }}
+              placeholder="เพิ่มห้องคอม เช่น คอม3, ห้อง ICT, ห้องสื่อ"
+              className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            <button
+              type="button"
+              disabled={addingRoom || !newRoomName.trim() || activeComputerRooms.length >= LIMITS.COMPUTER_ROOMS_MAX}
+              onClick={() => void handleAddRoom()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-50 whitespace-nowrap shrink-0 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{addingRoom ? 'กำลังเพิ่ม...' : 'เพิ่มห้องคอม'}</span>
+            </button>
+          </div>
+
+          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            {activeComputerRooms.map((roomName, idx) => {
+              const isEditing = editingRoomIdx === idx;
+              const isConfirmDelete = confirmDeleteRoomIdx === idx;
+
+              return (
+                <div
+                  key={`${idx}-${roomName}`}
+                  className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-3.5 py-2.5"
+                >
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <span className="font-mono-num text-[11px] text-slate-400 w-6 shrink-0">
+                      {idx + 1}.
+                    </span>
+
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        maxLength={LIMITS.CLASS_MAX}
+                        value={editingRoomValue}
+                        onChange={(e) => setEditingRoomValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void handleSaveEditRoom(idx);
+                          } else if (e.key === 'Escape') {
+                            setEditingRoomIdx(null);
+                          }
+                        }}
+                        autoFocus
+                        className="flex-1 rounded-md border border-emerald-400 bg-white dark:bg-slate-800 px-2.5 py-1 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                          {roomName}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveEditRoom(idx)}
+                          disabled={savingRoomEdit}
+                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          <span>{savingRoomEdit ? 'กำลังบันทึก...' : 'บันทึก'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingRoomIdx(null)}
+                          disabled={savingRoomEdit}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    ) : isConfirmDelete ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteRoom(idx)}
+                          disabled={deletingRoomIdx === idx}
+                          className="rounded-md bg-rose-600 px-2 py-1 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                        >
+                          {deletingRoomIdx === idx ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteRoomIdx(null)}
+                          className="rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          ยกเลิก
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingRoomIdx(idx);
+                            setEditingRoomValue(roomName);
+                            setConfirmDeleteRoomIdx(null);
+                          }}
+                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-emerald-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-emerald-400 transition-colors"
+                          title="แก้ไขชื่อห้องคอม"
+                          aria-label={`แก้ไข ${roomName}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        {activeComputerRooms.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmDeleteRoomIdx(idx);
+                              setEditingRoomIdx(null);
+                            }}
+                            className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 transition-colors"
+                            title="ลบห้องคอม"
+                            aria-label={`ลบ ${roomName}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+
     {/* Grade Level Promotion Section */}
     {(() => {
       const gradeSummary = [1, 2, 3, 4, 5, 6].map((g) => {
-        const rooms = [1, 2, 3].map((r) => {
-          const cls = `ป.${g}/${r}`;
-          return { className: cls, count: studentCountByClass[cls] || 0 };
-        });
+        const matched = allClassOptions
+          .filter((cls) => new RegExp(`^ป\\.${g}/\\d+$`).test(cls))
+          .sort((a, b) => {
+            const ra = Number(a.split('/')[1] || 0);
+            const rb = Number(b.split('/')[1] || 0);
+            return ra - rb;
+          });
+        const rooms = matched.map((cls) => ({
+          className: cls,
+          count: studentCountByClass[cls] || 0,
+        }));
         const total = rooms.reduce((acc, item) => acc + item.count, 0);
         return { grade: g, rooms, total };
       });
@@ -1130,6 +1839,9 @@ export function SettingsView({
         .reduce((acc, g) => acc + g.total, 0);
       const p6Count = gradeSummary.find((g) => g.grade === 6)?.total || 0;
       const p5Count = gradeSummary.find((g) => g.grade === 5)?.total || 0;
+      const customClassesCount = allClassOptions
+        .filter((cls) => !/^ป\.[1-6]\/\d+$/.test(cls))
+        .reduce((acc, cls) => acc + (studentCountByClass[cls] || 0), 0);
 
       const sourceStudents = students
         .filter((s) => s.className === fromClass)
@@ -1421,6 +2133,11 @@ export function SettingsView({
                         );
                       })}
                     </div>
+                    {customClassesCount > 0 && (
+                      <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                        * หมายเหตุ: มีนักเรียนในชั้นเรียนชื่อกำหนดเองอีก {customClassesCount} คน ซึ่งสามารถเลือกย้ายชั้นได้ที่แท็บ &ldquo;ปรับระดับชั้นเฉพาะห้อง&rdquo;
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -1437,14 +2154,14 @@ export function SettingsView({
                           const nextFrom = e.target.value;
                           setFromClass(nextFrom);
                           setExcludedStudentIds([]);
-                          const suggested = suggestNextClass(nextFrom);
+                          const suggested = suggestNextClass(nextFrom, allClassOptions);
                           if (suggested !== nextFrom) {
                             setToClass(suggested);
                           }
                         }}
                         className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        {CLASS_LIST.map((cls) => (
+                        {allClassOptions.map((cls) => (
                           <option key={cls} value={cls}>
                             {cls} ({studentCountByClass[cls] || 0} คน)
                           </option>
@@ -1462,7 +2179,7 @@ export function SettingsView({
                         onChange={(e) => setToClass(e.target.value)}
                         className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        {CLASS_LIST.map((cls) => (
+                        {allClassOptions.map((cls) => (
                           <option key={cls} value={cls} disabled={cls === fromClass}>
                             {cls} ({studentCountByClass[cls] || 0} คน)
                           </option>
@@ -2143,7 +2860,7 @@ export function SettingsView({
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-1.5">
-                {CLASS_LIST.map((cls) => {
+                {allClassOptions.map((cls) => {
                   const count = studentCountByClass[cls] || 0;
                   const isSelected = selectedClearRooms.includes(cls);
                   const disabled = count === 0;

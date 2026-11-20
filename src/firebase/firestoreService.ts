@@ -22,9 +22,12 @@ import {
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import {
+  CLASS_LIST,
+  COMPUTER_ROOMS,
   DEFAULT_SCHEDULE_TIMES,
   DEFAULT_SETTINGS,
   DEFAULT_USAGE_TYPES,
+  EXTERNAL_VISITOR_CLASS,
   TEACHING_PERIODS,
   type AppSettings,
   type BookingMode,
@@ -198,7 +201,19 @@ function mapTeachingSchedule(id: string, data: Record<string, unknown>): Teachin
 }
 
 function makeScheduleDocId(computerRoom: string, dayOfWeek: DayOfWeek, period: number): string {
-  const roomKey = computerRoom === 'คอม1' ? 'r1' : computerRoom === 'คอม2' ? 'r2' : 'rx';
+  let roomKey = 'r1';
+  if (computerRoom === 'คอม1') {
+    roomKey = 'r1';
+  } else if (computerRoom === 'คอม2') {
+    roomKey = 'r2';
+  } else {
+    let hash = 2166136261;
+    for (let i = 0; i < computerRoom.length; i += 1) {
+      hash ^= computerRoom.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    roomKey = `r_${(hash >>> 0).toString(16)}`;
+  }
   return `sch_${roomKey}_${dayOfWeek}_p${period}`;
 }
 
@@ -313,6 +328,40 @@ export function sanitizeLabManagers(raw: unknown, primaryManager: string): strin
   return result;
 }
 
+export function sanitizeClassList(raw: unknown): string[] {
+  const source = Array.isArray(raw) ? raw : [...CLASS_LIST];
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const item of source) {
+    if (typeof item !== 'string') continue;
+    const trimmed = clampString(item, LIMITS.CLASS_MAX);
+    if (!trimmed || trimmed === EXTERNAL_VISITOR_CLASS || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+    if (result.length >= LIMITS.CLASS_LIST_MAX) break;
+  }
+
+  return result.length > 0 ? result : [...CLASS_LIST];
+}
+
+export function sanitizeComputerRooms(raw: unknown): string[] {
+  const source = Array.isArray(raw) ? raw : [...COMPUTER_ROOMS];
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const item of source) {
+    if (typeof item !== 'string') continue;
+    const trimmed = clampString(item, LIMITS.ROOM_MAX);
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+    if (result.length >= LIMITS.COMPUTER_ROOMS_MAX) break;
+  }
+
+  return result.length > 0 ? result : [...COMPUTER_ROOMS];
+}
+
 function mapSettings(data: Record<string, unknown>): {
   settings: AppSettings;
   usageTypes: string[];
@@ -327,6 +376,8 @@ function mapSettings(data: Record<string, unknown>): {
       labManagers: sanitizeLabManagers(data.labManagers, primaryManager),
       colors: sanitizeThemeColors(rawColors),
       scheduleTimes: sanitizeScheduleTimes(data.scheduleTimes),
+      classList: sanitizeClassList(data.classList),
+      computerRooms: sanitizeComputerRooms(data.computerRooms),
     },
     usageTypes: Array.isArray(data.usageTypes)
       ? data.usageTypes.map(String)
@@ -478,6 +529,8 @@ export async function seedInitialFirestoreIfEmpty(): Promise<void> {
         colors: sanitizeThemeColors(DEFAULT_SETTINGS.colors),
         usageTypes: [...DEFAULT_USAGE_TYPES],
         scheduleTimes: sanitizeScheduleTimes(undefined),
+        classList: [...CLASS_LIST],
+        computerRooms: [...COMPUTER_ROOMS],
         ownerId: uid,
         visibility: 'school',
         updatedAt: serverTimestamp(),
@@ -504,6 +557,8 @@ export async function seedInitialFirestoreIfEmpty(): Promise<void> {
       colors: sanitizeThemeColors(seed.settings?.colors),
       usageTypes: sanitizeUsageTypes(seed.usageTypes || [...DEFAULT_USAGE_TYPES], LIMITS.USAGE_TYPES_PRESET_MAX),
       scheduleTimes: sanitizeScheduleTimes(seed.settings?.scheduleTimes),
+      classList: [...CLASS_LIST],
+      computerRooms: [...COMPUTER_ROOMS],
       ownerId: uid,
       visibility: 'school',
       updatedAt: serverTimestamp(),
@@ -1127,7 +1182,7 @@ export const firestoreApi = {
 
       for (const d of snap.docs) {
         const stu = mapStudent(d.id, d.data() as Record<string, unknown>);
-        const match = /^ป\.([1-6])\/([1-3])$/.exec(stu.className.trim());
+        const match = /^ป\.([1-6])\/(\d+)$/.exec(stu.className.trim());
         if (!match) {
           updatedStudents.push(stu);
           continue;
@@ -1187,6 +1242,8 @@ export const firestoreApi = {
               colors: sanitizeThemeColors(),
               usageTypes: [...DEFAULT_USAGE_TYPES],
               scheduleTimes: sanitizeScheduleTimes(undefined),
+              classList: [...CLASS_LIST],
+              computerRooms: [...COMPUTER_ROOMS],
               ownerId: uid,
               visibility: 'school',
               updatedAt: serverTimestamp(),
@@ -1321,6 +1378,8 @@ export const firestoreApi = {
               colors: sanitizeThemeColors(),
               usageTypes: [...DEFAULT_USAGE_TYPES],
               scheduleTimes: sanitizeScheduleTimes(undefined),
+              classList: [...CLASS_LIST],
+              computerRooms: [...COMPUTER_ROOMS],
               ownerId: uid,
               visibility: 'school',
               updatedAt: serverTimestamp(),
@@ -1592,6 +1651,10 @@ export const firestoreApi = {
         payload.labManagers ?? existingData.labManagers,
         labManager
       );
+      const nextClassList = sanitizeClassList(payload.classList ?? existingData.classList);
+      const nextComputerRooms = sanitizeComputerRooms(
+        payload.computerRooms ?? existingData.computerRooms
+      );
 
       if (snap.exists()) {
         await updateDoc(ref, {
@@ -1600,6 +1663,8 @@ export const firestoreApi = {
           labManager,
           labManagers: nextLabManagers,
           colors,
+          classList: nextClassList,
+          computerRooms: nextComputerRooms,
           updatedAt: serverTimestamp(),
         });
       } else {
@@ -1611,6 +1676,8 @@ export const firestoreApi = {
           colors,
           usageTypes: [...DEFAULT_USAGE_TYPES],
           scheduleTimes: existingScheduleTimes,
+          classList: nextClassList,
+          computerRooms: nextComputerRooms,
           ownerId: uid,
           visibility: 'school',
           updatedAt: serverTimestamp(),
@@ -1623,6 +1690,8 @@ export const firestoreApi = {
         labManagers: nextLabManagers,
         colors,
         scheduleTimes: existingScheduleTimes,
+        classList: nextClassList,
+        computerRooms: nextComputerRooms,
       };
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
@@ -1672,6 +1741,8 @@ export const firestoreApi = {
           colors: sanitizeThemeColors(),
           usageTypes: [...DEFAULT_USAGE_TYPES],
           scheduleTimes: sanitizeScheduleTimes(undefined),
+          classList: [...CLASS_LIST],
+          computerRooms: [...COMPUTER_ROOMS],
           ownerId: uid,
           visibility: 'school',
           updatedAt: serverTimestamp(),
@@ -1680,6 +1751,236 @@ export const firestoreApi = {
       return {
         labManager: resolvedPrimary,
         labManagers: cleanedList,
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    }
+  },
+
+  updateClassList: async (
+    nextList: string[],
+    renameMap?: { from: string; to: string }
+  ): Promise<{
+    classList: string[];
+    renamedStudents: number;
+    renamedLogs: number;
+    renamedSchedules: number;
+  }> => {
+    const uid = getActorUid();
+    const seen = new Set<string>();
+    const cleanedList: string[] = [];
+
+    for (const item of nextList) {
+      const trimmed = clampString(item, LIMITS.CLASS_MAX);
+      if (!trimmed || trimmed === EXTERNAL_VISITOR_CLASS || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      cleanedList.push(trimmed);
+      if (cleanedList.length >= LIMITS.CLASS_LIST_MAX) break;
+    }
+
+    if (cleanedList.length === 0) {
+      throw new Error('ต้องมีรายชื่อชั้นเรียนอย่างน้อย 1 ชั้นเรียน');
+    }
+
+    const renameFrom = renameMap?.from ? clampString(renameMap.from, LIMITS.CLASS_MAX) : '';
+    const renameTo = renameMap?.to ? assertValidClassName(renameMap.to) : '';
+    const shouldRename = Boolean(renameFrom && renameTo && renameFrom !== renameTo);
+
+    const path = 'settings/app';
+    try {
+      const ref = doc(db, 'settings', 'app');
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        await updateDoc(ref, {
+          classList: cleanedList,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await setDoc(ref, {
+          schoolName: DEFAULT_SETTINGS.schoolName,
+          academicYear: DEFAULT_SETTINGS.academicYear,
+          labManager: DEFAULT_SETTINGS.labManager,
+          labManagers: sanitizeLabManagers(undefined, DEFAULT_SETTINGS.labManager),
+          colors: sanitizeThemeColors(),
+          usageTypes: [...DEFAULT_USAGE_TYPES],
+          scheduleTimes: sanitizeScheduleTimes(undefined),
+          classList: cleanedList,
+          computerRooms: [...COMPUTER_ROOMS],
+          ownerId: uid,
+          visibility: 'school',
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      let renamedStudents = 0;
+      let renamedLogs = 0;
+      let renamedSchedules = 0;
+
+      if (shouldRename) {
+        const [stuSnap, logSnap, schSnap] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, 'students'),
+              where('visibility', '==', 'school'),
+              where('className', '==', renameFrom)
+            )
+          ),
+          getDocs(
+            query(
+              collection(db, 'logs'),
+              where('visibility', '==', 'school'),
+              where('className', '==', renameFrom)
+            )
+          ),
+          getDocs(
+            query(
+              collection(db, 'teachingSchedules'),
+              where('visibility', '==', 'school'),
+              where('className', '==', renameFrom)
+            )
+          ),
+        ]);
+
+        const updateRefs: ReturnType<typeof doc>[] = [];
+        for (const d of stuSnap.docs) {
+          updateRefs.push(d.ref);
+          renamedStudents += 1;
+        }
+        for (const d of logSnap.docs) {
+          updateRefs.push(d.ref);
+          renamedLogs += 1;
+        }
+        for (const d of schSnap.docs) {
+          updateRefs.push(d.ref);
+          renamedSchedules += 1;
+        }
+
+        const CHUNK = 400;
+        for (let i = 0; i < updateRefs.length; i += CHUNK) {
+          const batch = writeBatch(db);
+          for (const targetRef of updateRefs.slice(i, i + CHUNK)) {
+            batch.update(targetRef, {
+              className: renameTo,
+              updatedAt: serverTimestamp(),
+            });
+          }
+          await batch.commit();
+        }
+      }
+
+      return {
+        classList: cleanedList,
+        renamedStudents,
+        renamedLogs,
+        renamedSchedules,
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    }
+  },
+
+  updateComputerRooms: async (
+    nextRooms: string[],
+    renameMap?: { from: string; to: string }
+  ): Promise<{
+    computerRooms: string[];
+    renamedLogs: number;
+    renamedSchedules: number;
+  }> => {
+    const uid = getActorUid();
+    const seen = new Set<string>();
+    const cleanedList: string[] = [];
+
+    for (const item of nextRooms) {
+      const trimmed = clampString(item, LIMITS.ROOM_MAX);
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      cleanedList.push(trimmed);
+      if (cleanedList.length >= LIMITS.COMPUTER_ROOMS_MAX) break;
+    }
+
+    if (cleanedList.length === 0) {
+      throw new Error('ต้องมีรายชื่อห้องคอมพิวเตอร์อย่างน้อย 1 ห้อง');
+    }
+
+    const renameFrom = renameMap?.from ? clampString(renameMap.from, LIMITS.ROOM_MAX) : '';
+    const renameTo = renameMap?.to ? clampString(renameMap.to, LIMITS.ROOM_MAX) : '';
+    const shouldRename = Boolean(renameFrom && renameTo && renameFrom !== renameTo);
+
+    const path = 'settings/app';
+    try {
+      const ref = doc(db, 'settings', 'app');
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        await updateDoc(ref, {
+          computerRooms: cleanedList,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await setDoc(ref, {
+          schoolName: DEFAULT_SETTINGS.schoolName,
+          academicYear: DEFAULT_SETTINGS.academicYear,
+          labManager: DEFAULT_SETTINGS.labManager,
+          labManagers: sanitizeLabManagers(undefined, DEFAULT_SETTINGS.labManager),
+          colors: sanitizeThemeColors(),
+          usageTypes: [...DEFAULT_USAGE_TYPES],
+          scheduleTimes: sanitizeScheduleTimes(undefined),
+          classList: [...CLASS_LIST],
+          computerRooms: cleanedList,
+          ownerId: uid,
+          visibility: 'school',
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      let renamedLogs = 0;
+      let renamedSchedules = 0;
+
+      if (shouldRename) {
+        const [logSnap, schSnap] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, 'logs'),
+              where('visibility', '==', 'school'),
+              where('computerRoom', '==', renameFrom)
+            )
+          ),
+          getDocs(
+            query(
+              collection(db, 'teachingSchedules'),
+              where('visibility', '==', 'school'),
+              where('computerRoom', '==', renameFrom)
+            )
+          ),
+        ]);
+
+        const updateRefs: ReturnType<typeof doc>[] = [];
+        for (const d of logSnap.docs) {
+          updateRefs.push(d.ref);
+          renamedLogs += 1;
+        }
+        for (const d of schSnap.docs) {
+          updateRefs.push(d.ref);
+          renamedSchedules += 1;
+        }
+
+        const CHUNK = 400;
+        for (let i = 0; i < updateRefs.length; i += CHUNK) {
+          const batch = writeBatch(db);
+          for (const targetRef of updateRefs.slice(i, i + CHUNK)) {
+            batch.update(targetRef, {
+              computerRoom: renameTo,
+              updatedAt: serverTimestamp(),
+            });
+          }
+          await batch.commit();
+        }
+      }
+
+      return {
+        computerRooms: cleanedList,
+        renamedLogs,
+        renamedSchedules,
       };
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
@@ -1741,6 +2042,8 @@ export const firestoreApi = {
           colors: sanitizeThemeColors(),
           usageTypes: [...DEFAULT_USAGE_TYPES],
           scheduleTimes: nextScheduleTimes,
+          classList: [...CLASS_LIST],
+          computerRooms: [...COMPUTER_ROOMS],
           ownerId: uid,
           visibility: 'school',
           updatedAt: serverTimestamp(),
@@ -2357,6 +2660,12 @@ export const firestoreApi = {
         const scheduleTimes = sanitizeScheduleTimes(
           incomingSettings.scheduleTimes || currentMapped.settings.scheduleTimes
         );
+        const classList = sanitizeClassList(
+          incomingSettings.classList || currentMapped.settings.classList
+        );
+        const computerRooms = sanitizeComputerRooms(
+          incomingSettings.computerRooms || currentMapped.settings.computerRooms
+        );
 
         const settingsRef = doc(db, 'settings', 'app');
         if (settingsSnap.exists()) {
@@ -2371,6 +2680,8 @@ export const firestoreApi = {
               colors,
               usageTypes,
               scheduleTimes,
+              classList,
+              computerRooms,
               updatedAt: serverTimestamp(),
             },
           });
@@ -2386,6 +2697,8 @@ export const firestoreApi = {
               colors,
               usageTypes,
               scheduleTimes,
+              classList,
+              computerRooms,
               ownerId: uid,
               visibility: 'school',
               updatedAt: serverTimestamp(),

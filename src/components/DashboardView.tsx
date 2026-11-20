@@ -10,7 +10,6 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import {
-  CLASS_LIST,
   THAI_MONTHS,
   type PageId,
   type Student,
@@ -25,6 +24,7 @@ interface DashboardViewProps {
   logs: UsageLog[];
   students: Student[];
   subjects: Subject[];
+  classList: string[];
   academicYear: string;
   onNavigate: (page: PageId) => void;
 }
@@ -34,6 +34,7 @@ export function DashboardView({
   logs,
   students,
   subjects,
+  classList,
   academicYear,
   onNavigate,
 }: DashboardViewProps) {
@@ -150,10 +151,10 @@ export function DashboardView({
             </span>
           </div>
           <div className="mt-3 font-mono-num text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            {CLASS_LIST.length}
+            {classList.length}
           </div>
           <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-            เข้าใช้งานแล้ว <span className="font-mono-num font-semibold text-amber-700 dark:text-amber-300">{activeClassesCount}</span> ชั้นเรียน (ป.1 - ป.6)
+            เข้าใช้งานแล้ว <span className="font-mono-num font-semibold text-amber-700 dark:text-amber-300">{activeClassesCount}</span> จาก {classList.length} ชั้นเรียน
           </p>
         </div>
 

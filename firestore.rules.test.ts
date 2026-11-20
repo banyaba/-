@@ -115,12 +115,12 @@ export const DIRTY_DOZEN_TESTS: SecurityTestCase[] = [
   },
   {
     id: 8,
-    name: 'Invalid class pattern outside ป.1/1 - ป.6/3',
+    name: 'Invalid className rejected on student create (external visitor / empty / > 32 chars)',
     collection: 'students',
     operation: 'create',
     docId: 'stu_test_8',
     auth: { uid: 'admin1', email: 'banyaba@narathiwat1.go.th', email_verified: true },
-    payload: { className: 'ม.1/1' },
+    payload: { className: 'บุคคลภายนอก' },
     expected: 'PERMISSION_DENIED',
   },
   {

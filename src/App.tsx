@@ -26,6 +26,8 @@ import {
 import {
   DEFAULT_SETTINGS,
   DEFAULT_USAGE_TYPES,
+  getActiveClassList,
+  getActiveComputerRooms,
   type AppSettings,
   type BookingMode,
   type PageId,
@@ -82,6 +84,14 @@ const NAV_ITEMS: NavItem[] = [
     headerTint: 'from-blue-600 to-indigo-600',
   },
   {
+    id: 'data-table',
+    label: 'ประวัติการใช้',
+    icon: Table2,
+    iconClass: 'bg-teal-50 text-teal-600 dark:bg-teal-950/70 dark:text-teal-400',
+    activeGradient: 'linear-gradient(135deg, #0d9488, #059669)',
+    headerTint: 'from-teal-600 to-emerald-600',
+  },
+  {
     id: 'dashboard',
     label: 'หน้าหลัก',
     icon: LayoutDashboard,
@@ -96,14 +106,6 @@ const NAV_ITEMS: NavItem[] = [
     iconClass: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-400',
     activeGradient: 'linear-gradient(135deg, #10b981, #059669)',
     headerTint: 'from-emerald-600 to-teal-600',
-  },
-  {
-    id: 'data-table',
-    label: 'ประวัติการใช้',
-    icon: Table2,
-    iconClass: 'bg-teal-50 text-teal-600 dark:bg-teal-950/70 dark:text-teal-400',
-    activeGradient: 'linear-gradient(135deg, #0d9488, #059669)',
-    headerTint: 'from-teal-600 to-emerald-600',
   },
   {
     id: 'statistics',
@@ -405,6 +407,9 @@ export default function App() {
     () => bookings.filter((b) => b.status === 'pending').length,
     [bookings]
   );
+
+  const activeClassList = useMemo(() => getActiveClassList(settings), [settings]);
+  const activeComputerRooms = useMemo(() => getActiveComputerRooms(settings), [settings]);
 
   // Guard admin-only routes if role is 'user'
   useEffect(() => {
@@ -1006,6 +1011,7 @@ export default function App() {
                   logs={logs}
                   students={students}
                   subjects={subjects}
+                  classList={activeClassList}
                   academicYear={settings.academicYear}
                   onNavigate={handleNavigate}
                 />
@@ -1016,6 +1022,8 @@ export default function App() {
                   role={role}
                   students={students}
                   subjects={subjects}
+                  classList={activeClassList}
+                  computerRooms={activeComputerRooms}
                   usageTypes={usageTypes}
                   defaultRecorder={settings.labManager}
                   labManagers={settings.labManagers}
@@ -1087,6 +1095,7 @@ export default function App() {
                   role={role}
                   logs={logs}
                   subjects={subjects}
+                  classList={activeClassList}
                   onEditLog={(log) => {
                     setEditingLog(log);
                     setActivePage('add-data');
@@ -1103,6 +1112,7 @@ export default function App() {
               {activePage === 'students' && role === 'admin' && (
                 <StudentsView
                   students={students}
+                  classList={activeClassList}
                   onStudentsChanged={setStudents}
                   onNotify={notify}
                 />

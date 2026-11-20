@@ -1,8 +1,10 @@
-import { CLASS_LIST, DEFAULT_THEME_COLORS, EXTERNAL_VISITOR_CLASS, type ThemeColors } from '../types';
+import { DEFAULT_THEME_COLORS, EXTERNAL_VISITOR_CLASS, type ThemeColors } from '../types';
 
 export const LIMITS = {
   NAME_MAX: 120,
-  CLASS_MAX: 20,
+  CLASS_MAX: 32,
+  CLASS_LIST_MAX: 60,
+  COMPUTER_ROOMS_MAX: 20,
   CODE_MAX: 32,
   NOTE_MAX: 300,
   SUBJECT_NOTE_MAX: 240,
@@ -21,7 +23,6 @@ export const LIMITS = {
 
 export const PATTERNS = {
   ID: /^[a-zA-Z0-9_\-]+$/,
-  CLASS_NAME: /^ป\.[1-6]\/[1-3]$/,
   ISO_DATE: /^\d{4}-\d{2}-\d{2}$/,
   TIME_HHMM: /^([01]\d|2[0-3]):[0-5]\d$/,
   HEX_COLOR: /^#[0-9a-fA-F]{6}$/,
@@ -38,8 +39,8 @@ export function sanitizeId(value: string | undefined | null): string {
 
 export function assertValidClassName(className: string): string {
   const trimmed = clampString(className, LIMITS.CLASS_MAX);
-  if (!PATTERNS.CLASS_NAME.test(trimmed) || !CLASS_LIST.includes(trimmed)) {
-    throw new Error('ชั้นเรียนไม่ถูกต้อง (ต้องเป็น ป.1/1 - ป.6/3)');
+  if (!trimmed || trimmed === EXTERNAL_VISITOR_CLASS) {
+    throw new Error('ชื่อชั้นเรียนไม่ถูกต้อง (ต้องยาว 1-32 ตัวอักษร และไม่ใช่ "บุคคลภายนอก")');
   }
   return trimmed;
 }

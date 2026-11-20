@@ -219,6 +219,8 @@ export interface AppSettings {
   labManagers?: string[];
   colors: ThemeColors;
   scheduleTimes?: ScheduleTimeSettings;
+  classList?: string[];
+  computerRooms?: string[];
 }
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
@@ -236,7 +238,25 @@ export const DEFAULT_SETTINGS: AppSettings = {
   labManagers: ['ครูธนากร สุขสวัสดิ์'],
   colors: DEFAULT_THEME_COLORS,
   scheduleTimes: DEFAULT_SCHEDULE_TIMES,
+  classList: [...CLASS_LIST],
+  computerRooms: [...COMPUTER_ROOMS],
 };
+
+export function getActiveClassList(settings?: Partial<AppSettings>): string[] {
+  const list = settings?.classList;
+  if (Array.isArray(list) && list.length > 0) {
+    return list;
+  }
+  return [...CLASS_LIST];
+}
+
+export function getActiveComputerRooms(settings?: Partial<AppSettings>): string[] {
+  const rooms = settings?.computerRooms;
+  if (Array.isArray(rooms) && rooms.length > 0) {
+    return rooms;
+  }
+  return [...COMPUTER_ROOMS];
+}
 
 export interface LabDatabase {
   students: Student[];

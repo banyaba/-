@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
   CalendarDays,
@@ -15,9 +15,9 @@ import {
   X,
 } from 'lucide-react';
 import {
-  CLASS_LIST,
-  COMPUTER_ROOMS,
   DEFAULT_SCHEDULE_TIMES,
+  getActiveClassList,
+  getActiveComputerRooms,
   WEEKDAYS_MON_FRI,
   type AppSettings,
   type DayOfWeek,
@@ -44,12 +44,36 @@ interface TeachingSchedulePanelProps {
   onNotify: (type: 'success' | 'error', message: string) => void;
 }
 
-const SCHEDULE_CLASS_OPTIONS: readonly string[] = [
-  ...CLASS_LIST,
-  'ชุมนุมคอมพิวเตอร์',
-  'กิจกรรมพัฒนาผู้เรียน',
-  'อบรม / กิจกรรมพิเศษ',
-];
+const ROOM_COLOR_THEMES = [
+  {
+    cardClass: 'border-sky-200 dark:border-sky-800/70 bg-white dark:bg-slate-900/90',
+    badgeClass: 'bg-sky-600 text-white',
+    headerClass:
+      'border-sky-100/80 dark:border-sky-900/50 bg-gradient-to-r from-sky-50/90 via-blue-50/60 to-transparent dark:from-sky-950/40 dark:via-blue-950/30 dark:to-transparent',
+    iconBgClass: 'bg-gradient-to-br from-sky-600 to-blue-600',
+  },
+  {
+    cardClass: 'border-emerald-200 dark:border-emerald-800/70 bg-white dark:bg-slate-900/90',
+    badgeClass: 'bg-emerald-600 text-white',
+    headerClass:
+      'border-emerald-100/80 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-transparent dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-transparent',
+    iconBgClass: 'bg-gradient-to-br from-emerald-600 to-teal-600',
+  },
+  {
+    cardClass: 'border-violet-200 dark:border-violet-800/70 bg-white dark:bg-slate-900/90',
+    badgeClass: 'bg-violet-600 text-white',
+    headerClass:
+      'border-violet-100/80 dark:border-violet-900/50 bg-gradient-to-r from-violet-50/90 via-purple-50/60 to-transparent dark:from-violet-950/40 dark:via-purple-950/30 dark:to-transparent',
+    iconBgClass: 'bg-gradient-to-br from-violet-600 to-purple-600',
+  },
+  {
+    cardClass: 'border-amber-200 dark:border-amber-800/70 bg-white dark:bg-slate-900/90',
+    badgeClass: 'bg-amber-600 text-white',
+    headerClass:
+      'border-amber-100/80 dark:border-amber-900/50 bg-gradient-to-r from-amber-50/90 via-orange-50/60 to-transparent dark:from-amber-950/40 dark:via-orange-950/30 dark:to-transparent',
+    iconBgClass: 'bg-gradient-to-br from-amber-600 to-orange-600',
+  },
+] as const;
 
 interface TeacherColorTheme {
   boxClass: string;
@@ -122,8 +146,26 @@ export function TeachingSchedulePanel({
   onQuickBookRoom,
   onNotify,
 }: TeachingSchedulePanelProps) {
+  const activeClassList = useMemo(() => getActiveClassList(settings), [settings]);
+  const activeRooms = useMemo(() => getActiveComputerRooms(settings), [settings]);
+  const scheduleClassOptions = useMemo(
+    () => [
+      ...activeClassList,
+      'ชุมนุมคอมพิวเตอร์',
+      'กิจกรรมพัฒนาผู้เรียน',
+      'อบรม / กิจกรรมพิเศษ',
+    ],
+    [activeClassList]
+  );
+
   const [roomFilter, setRoomFilter] = useState<'all' | string>('all');
   const [seeding, setSeeding] = useState(false);
+
+  useEffect(() => {
+    if (roomFilter !== 'all' && !activeRooms.includes(roomFilter)) {
+      setRoomFilter('all');
+    }
+  }, [activeRooms, roomFilter]);
 
   const activeScheduleTimes: ScheduleTimeSettings = useMemo(() => {
     const raw = settings.scheduleTimes;
@@ -151,7 +193,9 @@ export function TeachingSchedulePanel({
   } | null>(null);
   const [formStartTime, setFormStartTime] = useState('08:30');
   const [formEndTime, setFormEndTime] = useState('09:30');
-  const [formClassName, setFormClassName] = useState(CLASS_LIST[9] || CLASS_LIST[0]);
+  const [formClassName, setFormClassName] = useState(
+    () => activeClassList[9] || activeClassList[0] || ''
+  );
   const [formSubjectChoice, setFormSubjectChoice] = useState('');
   const [formCustomSubject, setFormCustomSubject] = useState('');
   const [formTeacherName, setFormTeacherName] = useState(settings.labManager || '');
@@ -208,9 +252,14 @@ export function TeachingSchedulePanel({
   };
 
   const visibleRooms = useMemo(
-    () => (roomFilter === 'all' ? [...COMPUTER_ROOMS] : [roomFilter]),
-    [roomFilter]
+    () => (roomFilter === 'all' ? [...activeRooms] : [roomFilter]),
+    [roomFilter, activeRooms]
   );
+
+  const getRoomTheme = (room: string) => {
+    const idx = Math.max(0, activeRooms.indexOf(room));
+    return ROOM_COLOR_THEMES[idx % ROOM_COLOR_THEMES.length];
+  };
 
   const morningPeriods = activeScheduleTimes.periods.filter((p) => p.period <= 4);
   const afternoonPeriods = activeScheduleTimes.periods.filter((p) => p.period >= 5);
@@ -292,7 +341,7 @@ export function TeachingSchedulePanel({
     } else {
       setFormStartTime(pCfg.startTime);
       setFormEndTime(pCfg.endTime);
-      setFormClassName(CLASS_LIST[9] || CLASS_LIST[0]);
+      setFormClassName(activeClassList[9] || activeClassList[0] || '');
       if (subjects.length > 0) {
         setFormSubjectChoice(subjects[0].name);
         setFormCustomSubject('');
@@ -387,7 +436,7 @@ export function TeachingSchedulePanel({
     periodCfg: SchedulePeriodConfig
   ) => {
     const slot = slotMap.get(`${room}::${day}::${periodCfg.period}`) || null;
-    const isRoom1 = room === COMPUTER_ROOMS[0];
+    const roomTheme = getRoomTheme(room);
 
     if (slot) {
       const teacherTheme = getTeacherTheme(slot.teacherName);
@@ -402,19 +451,11 @@ export function TeachingSchedulePanel({
                 ? () => openSlotModal(room, day, periodCfg.period, slot)
                 : undefined
             }
-            className={`group relative rounded-lg p-2.5 h-full min-h-[84px] border transition-all ${
-              isRoom1
-                ? 'border-sky-200 dark:border-sky-800/70 bg-white dark:bg-slate-900/90'
-                : 'border-emerald-200 dark:border-emerald-800/70 bg-white dark:bg-slate-900/90'
-            } ${teacherTheme.cardBorderAccentClass} ${role === 'admin' ? 'cursor-pointer hover:shadow-xs' : ''}`}
+            className={`group relative rounded-lg p-2.5 h-full min-h-[84px] border transition-all ${roomTheme.cardClass} ${teacherTheme.cardBorderAccentClass} ${role === 'admin' ? 'cursor-pointer hover:shadow-xs' : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
               <span
-                className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap ${
-                  isRoom1
-                    ? 'bg-sky-600 text-white'
-                    : 'bg-emerald-600 text-white'
-                }`}
+                className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap ${roomTheme.badgeClass}`}
               >
                 {slot.className}
               </span>
@@ -496,7 +537,7 @@ export function TeachingSchedulePanel({
             </span>
             <div>
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                ตารางคาบสอน วันจันทร์ – วันศุกร์ (ห้องคอม 1 และ ห้องคอม 2)
+                ตารางคาบสอน วันจันทร์ – วันศุกร์ ({activeRooms.map((r) => `ห้อง ${r}`).join(', ')})
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {role === 'admin'
@@ -508,10 +549,10 @@ export function TeachingSchedulePanel({
 
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Room Switcher */}
-            <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
+            <div className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
               {[
-                { id: 'all', label: 'ทั้ง 2 ห้อง' },
-                ...COMPUTER_ROOMS.map((r) => ({ id: r, label: `ห้อง ${r}` })),
+                { id: 'all', label: `ทุกห้อง (${activeRooms.length} ห้อง)` },
+                ...activeRooms.map((r) => ({ id: r, label: `ห้อง ${r}` })),
               ].map((opt) => (
                 <button
                   key={opt.id}
@@ -578,7 +619,7 @@ export function TeachingSchedulePanel({
         </div>
 
         {visibleRooms.map((room) => {
-          const isRoom1 = room === COMPUTER_ROOMS[0];
+          const roomTheme = getRoomTheme(room);
           const roomCount = schedules.filter((s) => s.computerRoom === room).length;
           const totalSlots = WEEKDAYS_MON_FRI.length * activeScheduleTimes.periods.length;
 
@@ -588,19 +629,11 @@ export function TeachingSchedulePanel({
               className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden"
             >
               <div
-                className={`flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b ${
-                  isRoom1
-                    ? 'border-sky-100/80 dark:border-sky-900/50 bg-gradient-to-r from-sky-50/90 via-blue-50/60 to-transparent dark:from-sky-950/40 dark:via-blue-950/30 dark:to-transparent'
-                    : 'border-emerald-100/80 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-transparent dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-transparent'
-                }`}
+                className={`flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b ${roomTheme.headerClass}`}
               >
                 <div className="flex items-center gap-2.5">
                   <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-xs shrink-0 ${
-                      isRoom1
-                        ? 'bg-gradient-to-br from-sky-600 to-blue-600'
-                        : 'bg-gradient-to-br from-emerald-600 to-teal-600'
-                    }`}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-xs shrink-0 ${roomTheme.iconBgClass}`}
                   >
                     <Monitor className="h-4 w-4" />
                   </span>
@@ -988,7 +1021,13 @@ export function TeachingSchedulePanel({
                   onChange={(e) => setFormClassName(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
                 >
-                  {SCHEDULE_CLASS_OPTIONS.map((cls) => (
+                  {Array.from(
+                    new Set(
+                      formClassName && !scheduleClassOptions.includes(formClassName)
+                        ? [...scheduleClassOptions, formClassName]
+                        : scheduleClassOptions
+                    )
+                  ).map((cls) => (
                     <option key={cls} value={cls}>
                       {cls}
                     </option>
