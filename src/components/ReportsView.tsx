@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Calendar,
   CalendarRange,
@@ -7,8 +7,15 @@ import {
   FileText,
   Printer,
   Download,
+  Monitor,
+  Layers,
 } from 'lucide-react';
-import { THAI_MONTHS, type AppSettings, type UsageLog } from '../types';
+import {
+  getActiveComputerRooms,
+  THAI_MONTHS,
+  type AppSettings,
+  type UsageLog,
+} from '../types';
 import {
   exportLogsToCSV,
   filterLogsForReport,
@@ -33,11 +40,24 @@ interface ReportCriteria {
   semester: '1' | '2';
   academicYear: number;
   yearlyMode: 'academic' | 'calendar';
+  roomFilter: 'all' | string;
 }
 
 export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
   const now = new Date();
   const defaultBeYear = Number(settings.academicYear) || now.getFullYear() + 543;
+
+  const activeRooms = useMemo(() => getActiveComputerRooms(settings), [settings]);
+  const allKnownRooms = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...activeRooms,
+          ...logs.map((l) => (l.computerRoom || '').trim()).filter(Boolean),
+        ])
+      ),
+    [activeRooms, logs]
+  );
 
   const [draft, setDraft] = useState<ReportCriteria>({
     type: 'monthly',
@@ -47,9 +67,19 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
     semester: '1',
     academicYear: defaultBeYear,
     yearlyMode: 'academic',
+    roomFilter: 'all',
   });
 
   const [applied, setApplied] = useState<ReportCriteria>(draft);
+
+  useEffect(() => {
+    if (draft.roomFilter !== 'all' && !allKnownRooms.includes(draft.roomFilter)) {
+      setDraft((prev) => ({ ...prev, roomFilter: 'all' }));
+    }
+    if (applied.roomFilter !== 'all' && !allKnownRooms.includes(applied.roomFilter)) {
+      setApplied((prev) => ({ ...prev, roomFilter: 'all' }));
+    }
+  }, [allKnownRooms, draft.roomFilter, applied.roomFilter]);
 
   const availableBeYears = useMemo(() => {
     const set = new Set<number>([defaultBeYear, now.getFullYear() + 543, 2568, 2567]);
@@ -60,6 +90,26 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
     });
     return Array.from(set).sort((a, b) => b - a);
   }, [logs, defaultBeYear]);
+
+  // Usage counts per room for the current draft period (for quick indicator on room buttons)
+  const draftPeriodLogs = useMemo(
+    () => filterLogsForReport(logs, { ...draft, roomFilter: 'all' }),
+    [logs, draft]
+  );
+
+  const draftRoomCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of allKnownRooms) {
+      counts.set(r, 0);
+    }
+    for (const log of draftPeriodLogs) {
+      const rm = (log.computerRoom || '').trim();
+      if (rm) {
+        counts.set(rm, (counts.get(rm) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [draftPeriodLogs, allKnownRooms]);
 
   const reportLogs = useMemo(
     () =>
@@ -88,23 +138,65 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
     };
   }, [reportLogs]);
 
+  const roomBreakdown = useMemo(() => {
+    if (applied.roomFilter !== 'all') return [];
+    const total = reportLogs.length;
+    const rows = allKnownRooms.map((room) => {
+      const items = reportLogs.filter((l) => (l.computerRoom || '').trim() === room);
+      const stuSet = new Set(items.map((l) => `${l.className}::${l.studentName}`));
+      const pct = total > 0 ? Math.round((items.length / total) * 100) : 0;
+      return {
+        room,
+        usages: items.length,
+        uniqueStudents: stuSet.size,
+        pct,
+      };
+    });
+    const unspecified = reportLogs.filter((l) => !(l.computerRoom || '').trim());
+    if (unspecified.length > 0) {
+      const stuSet = new Set(unspecified.map((l) => `${l.className}::${l.studentName}`));
+      rows.push({
+        room: 'ไม่ระบุห้อง',
+        usages: unspecified.length,
+        uniqueStudents: stuSet.size,
+        pct: total > 0 ? Math.round((unspecified.length / total) * 100) : 0,
+      });
+    }
+    return rows;
+  }, [applied.roomFilter, reportLogs, allKnownRooms]);
+
+  const reportRoomLabel = useMemo(() => {
+    if (applied.roomFilter === 'all') {
+      return 'รวมทุกห้อง';
+    }
+    return applied.roomFilter.startsWith('ห้อง')
+      ? applied.roomFilter
+      : `ห้อง ${applied.roomFilter}`;
+  }, [applied.roomFilter]);
+
   const reportTitle = useMemo(() => {
+    const roomSuffix = ` (${reportRoomLabel})`;
     if (applied.type === 'daily') {
-      return `รายงานการใช้ห้องคอมพิวเตอร์ ประจำวันที่ ${formatThaiFullDate(applied.date)}`;
+      return `รายงานการใช้ห้องคอมพิวเตอร์${roomSuffix} ประจำวันที่ ${formatThaiFullDate(applied.date)}`;
     }
     if (applied.type === 'monthly') {
       const m = THAI_MONTHS[applied.month - 1];
-      return `รายงานการใช้ห้องคอมพิวเตอร์ ประจำเดือน ${m ? m.full : applied.month} พ.ศ. ${applied.beYear}`;
+      return `รายงานการใช้ห้องคอมพิวเตอร์${roomSuffix} ประจำเดือน ${m ? m.full : applied.month} พ.ศ. ${applied.beYear}`;
     }
     if (applied.type === 'semester') {
       const semLabel =
         applied.semester === '1' ? 'ภาคเรียนที่ 1 (พ.ค. – ก.ย.)' : 'ภาคเรียนที่ 2 (ต.ค. – เม.ย.)';
-      return `รายงานการใช้ห้องคอมพิวเตอร์ ${semLabel} ปีการศึกษา ${applied.academicYear}`;
+      return `รายงานการใช้ห้องคอมพิวเตอร์${roomSuffix} ${semLabel} ปีการศึกษา ${applied.academicYear}`;
     }
     return applied.yearlyMode === 'academic'
-      ? `รายงานการใช้ห้องคอมพิวเตอร์ ประจำปีการศึกษา ${applied.academicYear} (พ.ค. ${applied.academicYear} – เม.ย. ${applied.academicYear + 1})`
-      : `รายงานการใช้ห้องคอมพิวเตอร์ ประจำปี พ.ศ. ${applied.academicYear} (ม.ค. – ธ.ค.)`;
-  }, [applied]);
+      ? `รายงานการใช้ห้องคอมพิวเตอร์${roomSuffix} ประจำปีการศึกษา ${applied.academicYear} (พ.ค. ${applied.academicYear} – เม.ย. ${applied.academicYear + 1})`
+      : `รายงานการใช้ห้องคอมพิวเตอร์${roomSuffix} ประจำปี พ.ศ. ${applied.academicYear} (ม.ค. – ธ.ค.)`;
+  }, [applied, reportRoomLabel]);
+
+  const handleRoomSelect = (room: 'all' | string) => {
+    setDraft((prev) => ({ ...prev, roomFilter: room }));
+    setApplied((prev) => ({ ...prev, roomFilter: room }));
+  };
 
   const handleGenerate = () => {
     setApplied({ ...draft });
@@ -119,9 +211,13 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
   };
 
   const handleExportCSV = () => {
-    const rowsToExport = filterLogsForReport(logs, draft);
+    const rowsToExport = filterLogsForReport(logs, draft).sort((a, b) => {
+      const d = a.date.localeCompare(b.date);
+      if (d !== 0) return d;
+      return (a.timeIn || '').localeCompare(b.timeIn || '');
+    });
     if (rowsToExport.length === 0) {
-      onNotify('error', 'ไม่มีข้อมูลในช่วงรายงานที่เลือกสำหรับส่งออก CSV');
+      onNotify('error', 'ไม่มีข้อมูลในช่วงเวลาและห้องคอมที่เลือกสำหรับส่งออก CSV');
       return;
     }
     const suffix =
@@ -132,7 +228,9 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
         : draft.type === 'semester'
         ? `${draft.academicYear}-sem${draft.semester}`
         : `${draft.academicYear}`;
-    exportLogsToCSV(rowsToExport, `computer-lab-report-${suffix}.csv`);
+    const roomSlug =
+      draft.roomFilter === 'all' ? 'all-rooms' : draft.roomFilter.replace(/\s+/g, '-');
+    exportLogsToCSV(rowsToExport, `computer-lab-report-${roomSlug}-${suffix}.csv`);
     onNotify('success', `ส่งออกไฟล์ CSV จำนวน ${rowsToExport.length} รายการเรียบร้อยแล้ว`);
   };
 
@@ -151,7 +249,7 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
               กำหนดเงื่อนไขและออกรายงานการใช้ห้องคอมพิวเตอร์
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              เลือกรูปแบบช่วงเวลา สร้างตัวอย่าง พิมพ์ A4 หรือส่งออกไฟล์ CSV
+              เลือกรูปแบบช่วงเวลา เลือกดูแยกตามห้องคอมหรือรวมทุกห้อง พิมพ์ A4 หรือส่งออกไฟล์ CSV
             </p>
           </div>
         </div>
@@ -217,175 +315,241 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
 
           {/* Dynamic Criteria Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-          {draft.type === 'daily' && (
-            <div>
-              <label htmlFor="rep-date" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                เลือกวันที่
-              </label>
-              <input
-                id="rep-date"
-                type="date"
-                value={draft.date}
-                onChange={(e) => setDraft((p) => ({ ...p, date: e.target.value }))}
-                className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
-              />
+            {draft.type === 'daily' && (
+              <div>
+                <label htmlFor="rep-date" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  เลือกวันที่
+                </label>
+                <input
+                  id="rep-date"
+                  type="date"
+                  value={draft.date}
+                  onChange={(e) => setDraft((p) => ({ ...p, date: e.target.value }))}
+                  className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
+                />
+              </div>
+            )}
+
+            {draft.type === 'monthly' && (
+              <>
+                <div>
+                  <label htmlFor="rep-month" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    เลือกเดือน
+                  </label>
+                  <select
+                    id="rep-month"
+                    value={draft.month}
+                    onChange={(e) => setDraft((p) => ({ ...p, month: Number(e.target.value) }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
+                  >
+                    {THAI_MONTHS.map((m) => (
+                      <option key={m.index} value={m.index + 1}>
+                        {m.full}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="rep-year" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    ปี พ.ศ.
+                  </label>
+                  <select
+                    id="rep-year"
+                    value={draft.beYear}
+                    onChange={(e) => setDraft((p) => ({ ...p, beYear: Number(e.target.value) }))}
+                    className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
+                  >
+                    {availableBeYears.map((y) => (
+                      <option key={y} value={y}>
+                        พ.ศ. {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {draft.type === 'semester' && (
+              <>
+                <div>
+                  <label htmlFor="rep-sem" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    ภาคเรียน
+                  </label>
+                  <select
+                    id="rep-sem"
+                    value={draft.semester}
+                    onChange={(e) =>
+                      setDraft((p) => ({ ...p, semester: e.target.value as '1' | '2' }))
+                    }
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="1">ภาคเรียนที่ 1 (พ.ค. – ก.ย.)</option>
+                    <option value="2">ภาคเรียนที่ 2 (ต.ค. – เม.ย.)</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="rep-acad" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    ปีการศึกษา
+                  </label>
+                  <select
+                    id="rep-acad"
+                    value={draft.academicYear}
+                    onChange={(e) =>
+                      setDraft((p) => ({ ...p, academicYear: Number(e.target.value) }))
+                    }
+                    className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
+                  >
+                    {availableBeYears.map((y) => (
+                      <option key={y} value={y}>
+                        ปีการศึกษา {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {draft.type === 'yearly' && (
+              <>
+                <div>
+                  <label htmlFor="rep-yearly-acad" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    ปีการศึกษา
+                  </label>
+                  <select
+                    id="rep-yearly-acad"
+                    value={draft.academicYear}
+                    onChange={(e) =>
+                      setDraft((p) => ({ ...p, academicYear: Number(e.target.value) }))
+                    }
+                    className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
+                  >
+                    {availableBeYears.map((y) => (
+                      <option key={y} value={y}>
+                        ปีการศึกษา {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="rep-yearly-mode" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    ขอบเขตเดือน
+                  </label>
+                  <select
+                    id="rep-yearly-mode"
+                    value={draft.yearlyMode}
+                    onChange={(e) =>
+                      setDraft((p) => ({
+                        ...p,
+                        yearlyMode: e.target.value as 'academic' | 'calendar',
+                      }))
+                    }
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="academic">ตามปีการศึกษา (พ.ค. – เม.ย.)</option>
+                    <option value="calendar">ตามปีปฏิทิน (ม.ค. – ธ.ค.)</option>
+                  </select>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Computer Room Scope Filter (Separate or Combined) */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                เลือกห้องคอมพิวเตอร์ (แยกห้อง หรือ รวมทุกห้อง)
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                คลิกเพื่อสลับดูรายงานทันที
+              </span>
             </div>
-          )}
-
-          {draft.type === 'monthly' && (
-            <>
-              <div>
-                <label htmlFor="rep-month" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  เลือกเดือน
-                </label>
-                <select
-                  id="rep-month"
-                  value={draft.month}
-                  onChange={(e) => setDraft((p) => ({ ...p, month: Number(e.target.value) }))}
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => handleRoomSelect('all')}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition-all whitespace-nowrap ${
+                  draft.roomFilter === 'all'
+                    ? 'border-transparent bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/80'
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5 shrink-0" />
+                <span>รวมทุกห้อง</span>
+                <span
+                  className={`font-mono-num text-[11px] ${
+                    draft.roomFilter === 'all'
+                      ? 'text-slate-300 dark:text-slate-600'
+                      : 'text-slate-400 dark:text-slate-500'
+                  }`}
                 >
-                  {THAI_MONTHS.map((m) => (
-                    <option key={m.index} value={m.index + 1}>
-                      {m.full}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="rep-year" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  ปี พ.ศ.
-                </label>
-                <select
-                  id="rep-year"
-                  value={draft.beYear}
-                  onChange={(e) => setDraft((p) => ({ ...p, beYear: Number(e.target.value) }))}
-                  className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
-                >
-                  {availableBeYears.map((y) => (
-                    <option key={y} value={y}>
-                      พ.ศ. {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
+                  ({draftPeriodLogs.length})
+                </span>
+              </button>
 
-          {draft.type === 'semester' && (
-            <>
-              <div>
-                <label htmlFor="rep-sem" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  ภาคเรียน
-                </label>
-                <select
-                  id="rep-sem"
-                  value={draft.semester}
-                  onChange={(e) =>
-                    setDraft((p) => ({ ...p, semester: e.target.value as '1' | '2' }))
-                  }
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
-                >
-                  <option value="1">ภาคเรียนที่ 1 (พ.ค. – ก.ย.)</option>
-                  <option value="2">ภาคเรียนที่ 2 (ต.ค. – เม.ย.)</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="rep-acad" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  ปีการศึกษา
-                </label>
-                <select
-                  id="rep-acad"
-                  value={draft.academicYear}
-                  onChange={(e) =>
-                    setDraft((p) => ({ ...p, academicYear: Number(e.target.value) }))
-                  }
-                  className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
-                >
-                  {availableBeYears.map((y) => (
-                    <option key={y} value={y}>
-                      ปีการศึกษา {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
+              {allKnownRooms.map((room) => {
+                const isSelected = draft.roomFilter === room;
+                const count = draftRoomCounts.get(room) || 0;
+                const isConfigured = activeRooms.includes(room);
+                return (
+                  <button
+                    key={room}
+                    type="button"
+                    onClick={() => handleRoomSelect(room)}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition-all whitespace-nowrap ${
+                      isSelected
+                        ? 'border-transparent bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-xs'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/80'
+                    }`}
+                  >
+                    <Monitor className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      {room}
+                      {!isConfigured ? ' (เดิม)' : ''}
+                    </span>
+                    <span
+                      className={`font-mono-num text-[11px] ${
+                        isSelected ? 'text-blue-100' : 'text-slate-400 dark:text-slate-500'
+                      }`}
+                    >
+                      ({count})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-          {draft.type === 'yearly' && (
-            <>
-              <div>
-                <label htmlFor="rep-yearly-acad" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  ปีการศึกษา
-                </label>
-                <select
-                  id="rep-yearly-acad"
-                  value={draft.academicYear}
-                  onChange={(e) =>
-                    setDraft((p) => ({ ...p, academicYear: Number(e.target.value) }))
-                  }
-                  className="font-mono-num w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
-                >
-                  {availableBeYears.map((y) => (
-                    <option key={y} value={y}>
-                      ปีการศึกษา {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="rep-yearly-mode" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  ขอบเขตเดือน
-                </label>
-                <select
-                  id="rep-yearly-mode"
-                  value={draft.yearlyMode}
-                  onChange={(e) =>
-                    setDraft((p) => ({
-                      ...p,
-                      yearlyMode: e.target.value as 'academic' | 'calendar',
-                    }))
-                  }
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
-                >
-                  <option value="academic">ตามปีการศึกษา (พ.ค. – เม.ย.)</option>
-                  <option value="calendar">ตามปีปฏิทิน (ม.ค. – ธ.ค.)</option>
-                </select>
-              </div>
-            </>
-          )}
-        </div>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={handleGenerate}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-95 whitespace-nowrap"
+              style={{ backgroundColor: 'var(--theme-primary)' }}
+            >
+              <FileText className="h-4 w-4" />
+              <span>สร้างรายงาน</span>
+            </button>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <button
-            type="button"
-            onClick={handleGenerate}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-95 whitespace-nowrap"
-            style={{ backgroundColor: 'var(--theme-primary)' }}
-          >
-            <FileText className="h-4 w-4" />
-            <span>สร้างรายงาน</span>
-          </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 dark:border-indigo-800/70 bg-indigo-50/70 dark:bg-indigo-950/40 px-4 py-2.5 text-sm font-medium text-indigo-700 dark:text-indigo-200 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
+            >
+              <Printer className="h-4 w-4" />
+              <span>พิมพ์ A4</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 dark:border-indigo-800/70 bg-indigo-50/70 dark:bg-indigo-950/40 px-4 py-2.5 text-sm font-medium text-indigo-700 dark:text-indigo-200 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
-          >
-            <Printer className="h-4 w-4" />
-            <span>พิมพ์ A4</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-95 whitespace-nowrap"
-            style={{ backgroundColor: 'var(--theme-accent)' }}
-          >
-            <Download className="h-4 w-4" />
-            <span>Export CSV</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-95 whitespace-nowrap"
+              style={{ backgroundColor: 'var(--theme-accent)' }}
+            >
+              <Download className="h-4 w-4" />
+              <span>Export CSV</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -396,7 +560,7 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
           <h2 className="text-lg font-bold text-slate-900">{settings.schoolName}</h2>
           <p className="mt-1 text-base font-semibold text-indigo-900">{reportTitle}</p>
           <p className="mt-1 text-xs text-slate-500">
-            ปีการศึกษา {settings.academicYear} · ผู้รับผิดชอบห้องคอมพิวเตอร์: {settings.labManager}
+            ปีการศึกษา {settings.academicYear} · ขอบเขต: {reportRoomLabel} · ผู้รับผิดชอบห้องคอมพิวเตอร์: {settings.labManager}
           </p>
         </header>
 
@@ -427,6 +591,38 @@ export function ReportsView({ logs, settings, onNotify }: ReportsViewProps) {
             </div>
           </div>
         </section>
+
+        {/* Per-Room Summary Breakdown (when viewing combined report) */}
+        {applied.roomFilter === 'all' && roomBreakdown.length > 0 && (
+          <section className="mt-4">
+            <div className="text-xs font-semibold text-slate-700 mb-2">
+              สรุปจำนวนการใช้งานแยกตามห้องคอมพิวเตอร์
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {roomBreakdown.map((item) => (
+                <div
+                  key={item.room}
+                  className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5 flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-slate-800 truncate">
+                      {item.room}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono-num">
+                      {item.uniqueStudents.toLocaleString('th-TH')} คน
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono-num text-sm font-bold text-indigo-900">
+                      {item.usages.toLocaleString('th-TH')} ครั้ง
+                    </div>
+                    <div className="font-mono-num text-[11px] text-slate-500">{item.pct}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Detail Table */}
         <section className="mt-6">

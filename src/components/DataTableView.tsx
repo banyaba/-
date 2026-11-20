@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Search, Calendar, Trash2, Pencil, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Search, Calendar, Trash2, Pencil, RotateCcw, Monitor, Layers } from 'lucide-react';
 import { EXTERNAL_VISITOR_CLASS, type Subject, type UsageLog, type UserRole } from '../types';
 import { formatBuddhistISO, getTodayISO } from '../utils/thaiDate';
 import { api } from '../api/client';
@@ -10,6 +10,7 @@ interface DataTableViewProps {
   logs: UsageLog[];
   subjects: Subject[];
   classList: string[];
+  computerRooms: string[];
   onEditLog: (log: UsageLog) => void;
   onLogsChanged: (next: UsageLog[]) => void;
   onNotify: (type: 'success' | 'error', message: string) => void;
@@ -20,6 +21,7 @@ export function DataTableView({
   logs,
   subjects,
   classList,
+  computerRooms,
   onEditLog,
   onLogsChanged,
   onNotify,
@@ -28,6 +30,7 @@ export function DataTableView({
   const [searchDate, setSearchDate] = useState('');
   const [searchClass, setSearchClass] = useState('all');
   const [searchSubject, setSearchSubject] = useState('all');
+  const [searchRoom, setSearchRoom] = useState<'all' | string>('all');
 
   const [deleteTarget, setDeleteTarget] = useState<UsageLog | null>(null);
   const [confirmDeleteToday, setConfirmDeleteToday] = useState(false);
@@ -58,7 +61,26 @@ export function DataTableView({
     return [...classList, ...extra.sort((a, b) => a.localeCompare(b, 'th'))];
   }, [classList, logs]);
 
-  const filteredLogs = useMemo(() => {
+  const roomOptions = useMemo(() => {
+    const seen = new Set<string>(computerRooms);
+    const extra: string[] = [];
+    for (const l of logs) {
+      const rm = (l.computerRoom || '').trim();
+      if (rm && !seen.has(rm)) {
+        seen.add(rm);
+        extra.push(rm);
+      }
+    }
+    return [...computerRooms, ...extra.sort((a, b) => a.localeCompare(b, 'th'))];
+  }, [computerRooms, logs]);
+
+  useEffect(() => {
+    if (searchRoom !== 'all' && !roomOptions.includes(searchRoom)) {
+      setSearchRoom('all');
+    }
+  }, [roomOptions, searchRoom]);
+
+  const baseFilteredLogs = useMemo(() => {
     const q = searchName.trim().toLowerCase();
     return logs.filter((log) => {
       if (q && !log.studentName.toLowerCase().includes(q)) return false;
@@ -69,8 +91,31 @@ export function DataTableView({
     });
   }, [logs, searchName, searchDate, searchClass, searchSubject]);
 
+  const roomCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const rm of roomOptions) {
+      counts.set(rm, 0);
+    }
+    for (const log of baseFilteredLogs) {
+      const rm = (log.computerRoom || '').trim();
+      if (rm) {
+        counts.set(rm, (counts.get(rm) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [baseFilteredLogs, roomOptions]);
+
+  const filteredLogs = useMemo(() => {
+    if (searchRoom === 'all') return baseFilteredLogs;
+    return baseFilteredLogs.filter((log) => (log.computerRoom || '').trim() === searchRoom);
+  }, [baseFilteredLogs, searchRoom]);
+
   const hasFilters =
-    searchName !== '' || searchDate !== '' || searchClass !== 'all' || searchSubject !== 'all';
+    searchName !== '' ||
+    searchDate !== '' ||
+    searchClass !== 'all' ||
+    searchSubject !== 'all' ||
+    searchRoom !== 'all';
 
   const handleDeleteOne = async () => {
     if (!deleteTarget) return;
@@ -103,7 +148,7 @@ export function DataTableView({
 
   return (
     <div className="space-y-5">
-      {/* 4 Filters Toolbar */}
+      {/* Filters Toolbar */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[var(--theme-surface)] overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-teal-100/80 dark:border-teal-900/50 bg-gradient-to-r from-teal-50/90 via-emerald-50/60 to-transparent dark:from-teal-950/40 dark:via-emerald-950/30 dark:to-transparent px-5 py-3.5">
           <div className="flex items-center gap-2.5">
@@ -115,13 +160,70 @@ export function DataTableView({
                 ค้นหาและกรองประวัติการใช้งาน
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                กรองตามชื่อนักเรียน วันที่ ชั้นเรียน หรือรายวิชา
+                กรองตามห้องคอมพิวเตอร์ ชื่อนักเรียน วันที่ ชั้นเรียน หรือรายวิชา
               </p>
             </div>
           </div>
         </div>
 
-        <div className="p-5">
+        <div className="p-5 space-y-4">
+          {/* Room Quick Switcher */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 mr-1">
+              ห้องคอมพิวเตอร์:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchRoom('all')}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
+                searchRoom === 'all'
+                  ? 'border-transparent bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-xs'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/80'
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5 shrink-0" />
+              <span>รวมทุกห้อง</span>
+              <span
+                className={`font-mono-num text-[11px] ${
+                  searchRoom === 'all' ? 'text-teal-100' : 'text-slate-400 dark:text-slate-500'
+                }`}
+              >
+                ({baseFilteredLogs.length})
+              </span>
+            </button>
+
+            {roomOptions.map((room) => {
+              const isSelected = searchRoom === room;
+              const count = roomCounts.get(room) || 0;
+              const isConfigured = computerRooms.includes(room);
+              return (
+                <button
+                  key={room}
+                  type="button"
+                  onClick={() => setSearchRoom(room)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
+                    isSelected
+                      ? 'border-transparent bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-xs'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/80'
+                  }`}
+                >
+                  <Monitor className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    {room}
+                    {!isConfigured ? ' (เดิม)' : ''}
+                  </span>
+                  <span
+                    className={`font-mono-num text-[11px] ${
+                      isSelected ? 'text-teal-100' : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                  >
+                    ({count})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div>
               <label htmlFor="filter-name" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
@@ -196,10 +298,11 @@ export function DataTableView({
             </div>
           </div>
 
-          <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div className="pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="font-mono-num text-xs font-semibold text-teal-700 dark:text-teal-300">
                 แสดง {filteredLogs.length.toLocaleString('th-TH')} จาก {logs.length.toLocaleString('th-TH')} รายการ
+                {searchRoom !== 'all' ? ` · ${searchRoom}` : ''}
               </span>
               {hasFilters && (
                 <button
@@ -209,6 +312,7 @@ export function DataTableView({
                     setSearchDate('');
                     setSearchClass('all');
                     setSearchSubject('all');
+                    setSearchRoom('all');
                   }}
                   className="inline-flex items-center gap-1 rounded-md bg-teal-50 dark:bg-teal-950/50 px-2.5 py-1 text-xs font-medium text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-colors"
                 >

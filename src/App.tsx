@@ -1096,6 +1096,7 @@ export default function App() {
                   logs={logs}
                   subjects={subjects}
                   classList={activeClassList}
+                  computerRooms={activeComputerRooms}
                   onEditLog={(log) => {
                     setEditingLog(log);
                     setActivePage('add-data');

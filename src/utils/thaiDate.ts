@@ -84,9 +84,14 @@ export function filterLogsForReport(
     semester: '1' | '2';
     academicYear: number;
     yearlyMode?: 'academic' | 'calendar';
+    roomFilter?: string;
   }
 ): UsageLog[] {
   return logs.filter((log) => {
+    if (params.roomFilter && params.roomFilter !== 'all') {
+      if ((log.computerRoom || '').trim() !== params.roomFilter) return false;
+    }
+
     if (!log.date || !/^\d{4}-\d{2}-\d{2}$/.test(log.date)) return false;
     const [gYear, gMonth] = log.date.split('-').map(Number);
 
