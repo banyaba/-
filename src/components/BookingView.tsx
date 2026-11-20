@@ -126,6 +126,18 @@ export function BookingView({
     }));
   }, [settings.scheduleTimes]);
 
+  const fullRoomTimePresets = useMemo(
+    () => [
+      ...timePresets,
+      {
+        label: 'จองทั้งวัน (09:00–15:30 น.)',
+        start: '09:00',
+        end: '15:30',
+      },
+    ],
+    [timePresets]
+  );
+
   // Shared Date / Time / Room State
   const [date, setDate] = useState(getTodayISO());
   const [startTime, setStartTime] = useState('08:30');
@@ -934,8 +946,9 @@ export function BookingView({
                   เลือกช่วงเวลาด่วนตามคาบเรียน
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  {timePresets.map((preset) => {
+                  {fullRoomTimePresets.map((preset) => {
                     const active = startTime === preset.start && endTime === preset.end;
+                    const isFullDay = preset.start === '09:00' && preset.end === '15:30';
                     return (
                       <button
                         key={preset.label}
@@ -944,9 +957,13 @@ export function BookingView({
                           setStartTime(preset.start);
                           setEndTime(preset.end);
                         }}
-                        className={`font-mono-num rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                        className={`font-mono-num rounded-lg border px-3 py-1.5 text-xs transition-colors whitespace-nowrap ${
+                          isFullDay ? 'font-semibold ' : 'font-medium '
+                        }${
                           active
                             ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200'
+                            : isFullDay
+                            ? 'border-teal-300 dark:border-teal-700 bg-teal-50/70 dark:bg-teal-950/40 text-teal-800 dark:text-teal-200 hover:border-emerald-400 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/60'
                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:bg-slate-700'
                         }`}
                       >
