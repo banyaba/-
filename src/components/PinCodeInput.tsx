@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Delete, Eye, EyeOff } from 'lucide-react';
+import { Delete, Eye, EyeOff, Grid3X3 } from 'lucide-react';
 
 interface PinCodeInputProps {
   value: string;
@@ -19,6 +19,7 @@ export function PinCodeInput({
   label = 'รหัส PIN 6 หลัก',
 }: PinCodeInputProps) {
   const [showDigits, setShowDigits] = useState(false);
+  const [showKeypad, setShowKeypad] = useState(false);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? '');
@@ -118,25 +119,41 @@ export function PinCodeInput({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</span>
-        <button
-          type="button"
-          onClick={() => setShowDigits((prev) => !prev)}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          {showDigits ? (
-            <>
-              <EyeOff className="h-3.5 w-3.5" />
-              <span>ซ่อนตัวเลข</span>
-            </>
-          ) : (
-            <>
-              <Eye className="h-3.5 w-3.5" />
-              <span>แสดงตัวเลข</span>
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setShowKeypad((prev) => !prev)}
+            aria-expanded={showKeypad}
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+              showKeypad
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <Grid3X3 className="h-3.5 w-3.5" />
+            <span>{showKeypad ? 'ซ่อนปุ่มตัวเลข' : 'ปุ่มตัวเลข'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowDigits((prev) => !prev)}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+          >
+            {showDigits ? (
+              <>
+                <EyeOff className="h-3.5 w-3.5" />
+                <span>ซ่อนตัวเลข</span>
+              </>
+            ) : (
+              <>
+                <Eye className="h-3.5 w-3.5" />
+                <span>แสดงตัวเลข</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* 6 Digit Boxes */}
@@ -164,45 +181,47 @@ export function PinCodeInput({
         ))}
       </div>
 
-      {/* Tactile 3x4 Keypad */}
-      <div className="grid grid-cols-3 gap-2 pt-1">
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+      {/* Tactile 3x4 Keypad (shown on demand) */}
+      {showKeypad && (
+        <div className="grid grid-cols-3 gap-2 pt-1">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+            <button
+              key={digit}
+              type="button"
+              disabled={disabled}
+              onClick={() => handleKeypadDigit(digit)}
+              className="font-mono-num h-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-base font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-[0.98] disabled:opacity-50 transition-all"
+            >
+              {digit}
+            </button>
+          ))}
           <button
-            key={digit}
             type="button"
             disabled={disabled}
-            onClick={() => handleKeypadDigit(digit)}
+            onClick={handleClear}
+            className="h-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+          >
+            ล้างค่า
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => handleKeypadDigit('0')}
             className="font-mono-num h-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-base font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-[0.98] disabled:opacity-50 transition-all"
           >
-            {digit}
+            0
           </button>
-        ))}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={handleClear}
-          className="h-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
-        >
-          ล้างค่า
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => handleKeypadDigit('0')}
-          className="font-mono-num h-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-base font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-[0.98] disabled:opacity-50 transition-all"
-        >
-          0
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={handleKeypadBackspace}
-          aria-label="ลบตัวเลข"
-          className="h-11 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
-        >
-          <Delete className="h-4 w-4" />
-        </button>
-      </div>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={handleKeypadBackspace}
+            aria-label="ลบตัวเลข"
+            className="h-11 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+          >
+            <Delete className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
