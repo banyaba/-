@@ -613,8 +613,8 @@ export default function App() {
               <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 truncate">
                 ระบบบันทึกการใช้ห้องคอมพิวเตอร์
               </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                เชื่อมต่อฐานข้อมูล Cloud Firestore โดยตรง (ไม่ต้องใช้บัญชี Google)
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
+                โรงเรียนบ้านยะบะ (อุปการวิทยา)
               </p>
             </div>
           </div>
@@ -693,15 +693,15 @@ export default function App() {
                 <span>{pinVerifying ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบด้วยเลข 6 หลัก'}</span>
               </button>
 
-              <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   disabled={pinVerifying}
                   onClick={handlePasswordlessUserEnter}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-55 transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:from-emerald-700 hover:to-green-700 disabled:opacity-55 transition-all"
                 >
-                  <UserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>เข้าใช้งานทั่วไป (User) โดยไม่ต้องใส่รหัส</span>
+                  <UserCheck className="h-5 w-5 text-white shrink-0" strokeWidth={2.2} />
+                  <span>(User)ผู้ใช้ทั่วไป</span>
                 </button>
               </div>
             </form>

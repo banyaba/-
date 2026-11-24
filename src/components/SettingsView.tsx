@@ -27,6 +27,9 @@ import {
   CheckCircle2,
   Monitor,
   Layers,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
 } from 'lucide-react';
 import {
   CLASS_LIST,
@@ -198,6 +201,9 @@ export function SettingsView({
   const [deletingRoomIdx, setDeletingRoomIdx] = useState<number | null>(null);
   const [confirmResetRooms, setConfirmResetRooms] = useState(false);
   const [resettingRooms, setResettingRooms] = useState(false);
+  const [reorderingRooms, setReorderingRooms] = useState(false);
+  const [draggedRoomIdx, setDraggedRoomIdx] = useState<number | null>(null);
+  const [dragOverRoomIdx, setDragOverRoomIdx] = useState<number | null>(null);
 
   // Grade Promotion State
   const studentCountByClass = useMemo(() => {
@@ -1008,6 +1014,42 @@ export function SettingsView({
     }
   };
 
+  const handleMoveRoom = async (fromIndex: number, toIndex: number) => {
+    if (
+      reorderingRooms ||
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= activeComputerRooms.length ||
+      toIndex >= activeComputerRooms.length
+    ) {
+      return;
+    }
+
+    const previousRooms = [...activeComputerRooms];
+    const nextRooms = [...activeComputerRooms];
+    const [moved] = nextRooms.splice(fromIndex, 1);
+    nextRooms.splice(toIndex, 0, moved);
+
+    setEditingRoomIdx(null);
+    setConfirmDeleteRoomIdx(null);
+    setReorderingRooms(true);
+    onSettingsUpdated({ ...settings, computerRooms: nextRooms });
+
+    try {
+      const res = await api.updateComputerRooms(nextRooms);
+      onSettingsUpdated({ ...settings, computerRooms: res.computerRooms });
+      onNotify('success', `จัดลำดับห้องคอมพิวเตอร์ "${moved}" เรียบร้อยแล้ว`);
+    } catch (err) {
+      onSettingsUpdated({ ...settings, computerRooms: previousRooms });
+      onNotify('error', err instanceof Error ? err.message : 'ไม่สามารถบันทึกลำดับห้องคอมพิวเตอร์ได้');
+    } finally {
+      setReorderingRooms(false);
+      setDraggedRoomIdx(null);
+      setDragOverRoomIdx(null);
+    }
+  };
+
   const handleColorChange = (key: keyof ThemeColors, value: string) => {
     const nextColors = { ...colors, [key]: value };
     setColors(nextColors);
@@ -1696,18 +1738,83 @@ export function SettingsView({
             </button>
           </div>
 
+          {activeComputerRooms.length > 1 && (
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              ลากวางหรือกดลูกศรขึ้น–ลงเพื่อจัดลำดับห้องคอมพิวเตอร์ (ใช้เรียงลำดับในทุกเมนูของระบบ)
+            </p>
+          )}
+
           <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             {activeComputerRooms.map((roomName, idx) => {
               const isEditing = editingRoomIdx === idx;
               const isConfirmDelete = confirmDeleteRoomIdx === idx;
+              const canReorder =
+                activeComputerRooms.length > 1 &&
+                !isEditing &&
+                !isConfirmDelete &&
+                !reorderingRooms &&
+                !savingRoomEdit &&
+                deletingRoomIdx === null &&
+                !resettingRooms;
+              const isDragging = draggedRoomIdx === idx;
+              const isDragOver = dragOverRoomIdx === idx && draggedRoomIdx !== null && draggedRoomIdx !== idx;
 
               return (
                 <div
                   key={`${idx}-${roomName}`}
-                  className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-3.5 py-2.5"
+                  draggable={canReorder}
+                  onDragStart={(e) => {
+                    if (!canReorder) return;
+                    setDraggedRoomIdx(idx);
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(idx));
+                  }}
+                  onDragOver={(e) => {
+                    if (!canReorder || draggedRoomIdx === null) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverRoomIdx !== idx) {
+                      setDragOverRoomIdx(idx);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverRoomIdx === idx) {
+                      setDragOverRoomIdx(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const from = draggedRoomIdx;
+                    setDragOverRoomIdx(null);
+                    setDraggedRoomIdx(null);
+                    if (from !== null && from !== idx) {
+                      void handleMoveRoom(from, idx);
+                    }
+                  }}
+                  onDragEnd={() => {
+                    setDraggedRoomIdx(null);
+                    setDragOverRoomIdx(null);
+                  }}
+                  className={`flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-3.5 py-2.5 transition-colors ${
+                    isDragging
+                      ? 'opacity-50 bg-emerald-50/50 dark:bg-emerald-950/30'
+                      : isDragOver
+                      ? 'bg-emerald-50 dark:bg-emerald-950/50 ring-1 ring-inset ring-emerald-400'
+                      : ''
+                  }`}
                 >
-                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                    <span className="font-mono-num text-[11px] text-slate-400 w-6 shrink-0">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {activeComputerRooms.length > 1 && (
+                      <span
+                        className={`shrink-0 text-slate-400 dark:text-slate-500 ${
+                          canReorder ? 'cursor-grab active:cursor-grabbing hover:text-emerald-600 dark:hover:text-emerald-400' : 'opacity-40'
+                        }`}
+                        title="ลากเพื่อจัดลำดับ"
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </span>
+                    )}
+                    <span className="font-mono-num text-[11px] text-slate-400 w-5 shrink-0">
                       {idx + 1}.
                     </span>
 
@@ -1778,6 +1885,30 @@ export function SettingsView({
                       </>
                     ) : (
                       <>
+                        {activeComputerRooms.length > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={!canReorder || idx === 0}
+                              onClick={() => void handleMoveRoom(idx, idx - 1)}
+                              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-emerald-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-emerald-400 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                              title="เลื่อนขึ้น"
+                              aria-label={`เลื่อน ${roomName} ขึ้น`}
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!canReorder || idx === activeComputerRooms.length - 1}
+                              onClick={() => void handleMoveRoom(idx, idx + 1)}
+                              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-emerald-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-emerald-400 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                              title="เลื่อนลง"
+                              aria-label={`เลื่อน ${roomName} ลง`}
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
